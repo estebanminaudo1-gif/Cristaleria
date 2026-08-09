@@ -1,21 +1,28 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { SiniestroCaso, EstadoOperativo, EstadoFinanciero, Role, DashboardKPIs, FotoDocumento } from '../types';
 import { initialCasos } from '../mock/initialData';
+import { casosService } from '../services/casosService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface SiniestrosContextType {
   casos: SiniestroCaso[];
   activeRole: Role;
   setActiveRole: (role: Role) => void;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  isCloudConnected: boolean;
+  clearError: () => void;
   kpis: DashboardKPIs;
   getCasoById: (id: string) => SiniestroCaso | undefined;
   getCasoByToken: (token: string) => SiniestroCaso | undefined;
-  addCaso: (casoData: Partial<SiniestroCaso>) => SiniestroCaso;
-  updateCaso: (id: string, partial: Partial<SiniestroCaso>) => void;
-  changeEstadoOperativo: (id: string, estado: EstadoOperativo, motivo?: string) => void;
-  changeEstadoFinanciero: (id: string, estado: EstadoFinanciero) => void;
-  addFotoToCaso: (casoId: string, foto: Omit<FotoDocumento, 'id'>) => void;
-  marcarTrabajoRealizado: (casoId: string, costoPrestador: number, fotoUrl: string, firmaUrl?: string, obs?: string) => boolean;
-  parseEmailAndCreateCaso: (mailData: { aseguradora: string; siniestro: string; poliza?: string; asegurado: string; tel: string; direccion: string; detalle: string }) => SiniestroCaso;
+  addCaso: (casoData: Partial<SiniestroCaso>) => Promise<SiniestroCaso>;
+  updateCaso: (id: string, partial: Partial<SiniestroCaso>) => Promise<void>;
+  changeEstadoOperativo: (id: string, estado: EstadoOperativo, motivo?: string) => Promise<void>;
+  changeEstadoFinanciero: (id: string, estado: EstadoFinanciero) => Promise<void>;
+  addFotoToCaso: (casoId: string, foto: Omit<FotoDocumento, 'id'>) => Promise<void>;
+  marcarTrabajoRealizado: (casoId: string, costoPrestador: number, fotoUrl: string, firmaUrl?: string, obs?: string) => Promise<boolean>;
+  parseEmailAndCreateCaso: (mailData: { aseguradora: string; siniestro: string; poliza?: string; asegurado: string; tel: string; direccion: string; detalle: string }) => Promise<SiniestroCaso>;
 }
 
 const SiniestrosContext = createContext<SiniestrosContextType | undefined>(undefined);
@@ -23,6 +30,35 @@ const SiniestrosContext = createContext<SiniestrosContextType | undefined>(undef
 export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [casos, setCasos] = useState<SiniestroCaso[]>(initialCasos);
   const [activeRole, setActiveRole] = useState<Role>('ADMIN');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = () => setError(null);
+
+  // Carga inicial de datos desde Supabase o Fallback Mock
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCasos = async () => {
+      setLoading(true);
+      try {
+        if (isSupabaseConfigured) {
+          const data = await casosService.getCasos();
+          if (isMounted) setCasos(data);
+        } else {
+          if (isMounted) setCasos(initialCasos);
+        }
+      } catch (err: any) {
+        console.error('Error al cargar casos:', err);
+        if (isMounted) setError(err.message || 'No se pudieron obtener los datos de la nube.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchCasos();
+    return () => { isMounted = false; };
+  }, []);
 
   // Compute KPIs dynamically
   const kpis: DashboardKPIs = useMemo(() => {
@@ -73,135 +109,126 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const getCasoByToken = (token: string) => casos.find(c => c.magicToken === token);
 
-  const addCaso = (casoData: Partial<SiniestroCaso>): SiniestroCaso => {
-    const nextNroTrabajo = Math.max(...casos.map(c => c.nroTrabajo), 1123) + 1;
-    const now = new Date().toISOString();
-
-    const nuevoCaso: SiniestroCaso = {
-      id: `case-${Date.now()}`,
-      nroTrabajo: nextNroTrabajo,
-      nroSiniestro: casoData.nroSiniestro || `SIN-${nextNroTrabajo}`,
-      poliza: casoData.poliza || '-',
-      aseguradora: casoData.aseguradora || 'General',
-      fechaIngreso: now,
-      fechaDenuncia: casoData.fechaDenuncia || now.split('T')[0],
-      aseguradoNombre: casoData.aseguradoNombre || 'Asegurado Sin Nombre',
-      aseguradoTel: casoData.aseguradoTel || '-',
-      aseguradoDireccion: casoData.aseguradoDireccion || 'Sin dirección',
-      aseguradoCiudad: casoData.aseguradoCiudad || 'Mar del Plata',
-      prestadorAsignado: casoData.prestadorAsignado || 'Lolo',
-      fechaDerivacion: now.split('T')[0],
-      magicToken: `tok_${Math.random().toString(36).substring(2, 9)}`,
-      detalleTrabajo: casoData.detalleTrabajo || 'Trabajo de vidriado',
-      sumaAsegurada: casoData.sumaAsegurada || '100% en cobertura',
-      items: casoData.items || [
-        {
-          id: `item-${Date.now()}`,
-          tipoArticulo: 'Vidrio Float',
-          cantidad: 1
-        }
-      ],
-      fotos: [],
-      estadoOperativo: 'NUEVO',
-      estadoFinanciero: 'PENDIENTE_FACTURACION',
-      costoPrestador: casoData.costoPrestador || 0,
-      precioVidrioMaterial: casoData.precioVidrioMaterial || 0,
-      montoCompaniaSinIva: casoData.montoCompaniaSinIva || 0,
-      montoCompaniaFinal: (casoData.montoCompaniaSinIva || 0) * 1.21,
-      retencionIva: 0,
-      retencionGanancias: 0,
-      retencionIibb: 0,
-      timeline: [
-        {
-          id: `t-${Date.now()}`,
-          fecha: now,
-          usuario: 'Operador Sistema',
-          rol: activeRole,
-          evento: 'CREACION_CASO',
-          descripcion: `Siniestro #${nextNroTrabajo} creado manualmente`
-        }
-      ]
-    };
-
-    setCasos(prev => [nuevoCaso, ...prev]);
-    return nuevoCaso;
+  const addCaso = async (casoData: Partial<SiniestroCaso>): Promise<SiniestroCaso> => {
+    setSaving(true);
+    try {
+      const nuevo = await casosService.createCaso(casoData);
+      setCasos(prev => [nuevo, ...prev]);
+      return nuevo;
+    } catch (err: any) {
+      setError(err.message || 'Error al guardar el siniestro.');
+      throw err;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const updateCaso = (id: string, partial: Partial<SiniestroCaso>) => {
-    setCasos(prev =>
-      prev.map(c => {
-        if (c.id === id) {
-          const sinIva = partial.montoCompaniaSinIva !== undefined ? partial.montoCompaniaSinIva : c.montoCompaniaSinIva;
-          const finalConIva = sinIva * 1.21;
-
-          return {
-            ...c,
-            ...partial,
-            montoCompaniaSinIva: sinIva,
-            montoCompaniaFinal: Math.round(finalConIva * 100) / 100
-          };
-        }
-        return c;
-      })
-    );
+  const updateCaso = async (id: string, partial: Partial<SiniestroCaso>): Promise<void> => {
+    setSaving(true);
+    try {
+      if (isSupabaseConfigured) {
+        await casosService.updateCaso(id, partial);
+      }
+      setCasos(prev =>
+        prev.map(c => {
+          if (c.id === id) {
+            const sinIva = partial.montoCompaniaSinIva !== undefined ? partial.montoCompaniaSinIva : c.montoCompaniaSinIva;
+            const finalConIva = sinIva * 1.21;
+            return {
+              ...c,
+              ...partial,
+              montoCompaniaSinIva: sinIva,
+              montoCompaniaFinal: Math.round(finalConIva * 100) / 100
+            };
+          }
+          return c;
+        })
+      );
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar el caso.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const changeEstadoOperativo = (id: string, nuevoEstado: EstadoOperativo, motivo?: string) => {
-    const now = new Date().toISOString();
-    setCasos(prev =>
-      prev.map(c => {
-        if (c.id === id) {
-          const nuevoTimeline = [
-            ...c.timeline,
-            {
-              id: `t-${Date.now()}`,
-              fecha: now,
-              usuario: 'Usuario Operaciones',
-              rol: activeRole,
-              evento: 'CAMBIO_ESTADO_OPERATIVO',
-              descripcion: `Transición a ${nuevoEstado}${motivo ? `. Motivo: ${motivo}` : ''}`
-            }
-          ];
-          return {
-            ...c,
-            estadoOperativo: nuevoEstado,
-            causaCancelacion: motivo || c.causaCancelacion,
-            timeline: nuevoTimeline
-          };
-        }
-        return c;
-      })
-    );
+  const changeEstadoOperativo = async (id: string, nuevoEstado: EstadoOperativo, motivo?: string): Promise<void> => {
+    setSaving(true);
+    try {
+      const now = new Date().toISOString();
+      if (isSupabaseConfigured) {
+        await casosService.updateCaso(id, { estadoOperativo: nuevoEstado, causaCancelacion: motivo });
+        await casosService.addEvento(id, 'CAMBIO_ESTADO_OPERATIVO', `Transición a ${nuevoEstado}${motivo ? `. Motivo: ${motivo}` : ''}`);
+      }
+
+      setCasos(prev =>
+        prev.map(c => {
+          if (c.id === id) {
+            return {
+              ...c,
+              estadoOperativo: nuevoEstado,
+              causaCancelacion: motivo || c.causaCancelacion,
+              timeline: [
+                ...c.timeline,
+                {
+                  id: `t-${Date.now()}`,
+                  fecha: now,
+                  usuario: 'Usuario Operaciones',
+                  rol: activeRole,
+                  evento: 'CAMBIO_ESTADO_OPERATIVO',
+                  descripcion: `Transición a ${nuevoEstado}${motivo ? `. Motivo: ${motivo}` : ''}`
+                }
+              ]
+            };
+          }
+          return c;
+        })
+      );
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar estado operativo.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const changeEstadoFinanciero = (id: string, nuevoEstado: EstadoFinanciero) => {
-    const now = new Date().toISOString();
-    setCasos(prev =>
-      prev.map(c => {
-        if (c.id === id) {
-          const nuevoTimeline = [
-            ...c.timeline,
-            {
-              id: `t-${Date.now()}`,
-              fecha: now,
-              usuario: 'Usuario Administración',
-              rol: activeRole,
-              evento: 'CAMBIO_ESTADO_FINANCIERO',
-              descripcion: `Estado financiero actualizado a ${nuevoEstado}`
-            }
-          ];
-          return {
-            ...c,
-            estadoFinanciero: nuevoEstado,
-            timeline: nuevoTimeline
-          };
-        }
-        return c;
-      })
-    );
+  const changeEstadoFinanciero = async (id: string, nuevoEstado: EstadoFinanciero): Promise<void> => {
+    setSaving(true);
+    try {
+      const now = new Date().toISOString();
+      if (isSupabaseConfigured) {
+        await casosService.updateCaso(id, { estadoFinanciero: nuevoEstado });
+        await casosService.addEvento(id, 'CAMBIO_ESTADO_FINANCIERO', `Estado financiero actualizado a ${nuevoEstado}`);
+      }
+
+      setCasos(prev =>
+        prev.map(c => {
+          if (c.id === id) {
+            return {
+              ...c,
+              estadoFinanciero: nuevoEstado,
+              timeline: [
+                ...c.timeline,
+                {
+                  id: `t-${Date.now()}`,
+                  fecha: now,
+                  usuario: 'Usuario Administración',
+                  rol: activeRole,
+                  evento: 'CAMBIO_ESTADO_FINANCIERO',
+                  descripcion: `Estado financiero actualizado a ${nuevoEstado}`
+                }
+              ]
+            };
+          }
+          return c;
+        })
+      );
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar estado financiero.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const addFotoToCaso = (casoId: string, fotoData: Omit<FotoDocumento, 'id'>) => {
+  const addFotoToCaso = async (casoId: string, fotoData: Omit<FotoDocumento, 'id'>): Promise<void> => {
     const nuevaFoto: FotoDocumento = {
       ...fotoData,
       id: `foto-${Date.now()}`
@@ -220,68 +247,85 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
-  const marcarTrabajoRealizado = (
+  const marcarTrabajoRealizado = async (
     casoId: string,
     costoPrestador: number,
     fotoUrl: string,
     firmaUrl?: string,
     obs?: string
-  ): boolean => {
+  ): Promise<boolean> => {
     const caso = getCasoById(casoId);
     if (!caso) return false;
 
-    const now = new Date().toISOString();
-    const fotosNuevas: FotoDocumento[] = [
-      {
-        id: `foto-${Date.now()}-1`,
-        tipo: 'FOTO_DESPUES',
-        url: fotoUrl,
-        subidoPor: caso.prestadorAsignado || 'Vidriero PWA',
-        fecha: now
-      }
-    ];
-
-    if (firmaUrl) {
-      fotosNuevas.push({
-        id: `foto-${Date.now()}-2`,
-        tipo: 'FIRMA_CONFORMIDAD',
-        url: firmaUrl,
-        subidoPor: 'Asegurado Cliente',
-        fecha: now
-      });
-    }
-
-    setCasos(prev =>
-      prev.map(c => {
-        if (c.id === casoId) {
-          return {
-            ...c,
-            costoPrestador: costoPrestador || c.costoPrestador,
-            fechaRealizacion: now.split('T')[0],
-            estadoOperativo: 'TRABAJO_REALIZADO',
-            infoExtraOperativa: obs ? `${c.infoExtraOperativa || ''}\n[PWA Vidriero]: ${obs}` : c.infoExtraOperativa,
-            fotos: [...c.fotos, ...fotosNuevas],
-            timeline: [
-              ...c.timeline,
-              {
-                id: `t-${Date.now()}`,
-                fecha: now,
-                usuario: `${c.prestadorAsignado || 'Vidriero'} (PWA Móvil)`,
-                rol: 'PRESTADOR',
-                evento: 'TRABAJO_REALIZADO',
-                descripcion: 'Trabajo finalizado registrado con fotos y conformidad desde celular'
-              }
-            ]
-          };
+    setSaving(true);
+    try {
+      const now = new Date().toISOString();
+      const fotosNuevas: FotoDocumento[] = [
+        {
+          id: `foto-${Date.now()}-1`,
+          tipo: 'FOTO_DESPUES',
+          url: fotoUrl,
+          subidoPor: caso.prestadorAsignado || 'Vidriero PWA',
+          fecha: now
         }
-        return c;
-      })
-    );
+      ];
 
-    return true;
+      if (firmaUrl) {
+        fotosNuevas.push({
+          id: `foto-${Date.now()}-2`,
+          tipo: 'FIRMA_CONFORMIDAD',
+          url: firmaUrl,
+          subidoPor: 'Asegurado Cliente',
+          fecha: now
+        });
+      }
+
+      if (isSupabaseConfigured) {
+        await casosService.updateCaso(casoId, {
+          costoPrestador,
+          estadoOperativo: 'TRABAJO_REALIZADO',
+          fechaRealizacion: now.split('T')[0]
+        });
+        await casosService.addEvento(casoId, 'TRABAJO_REALIZADO', 'Trabajo finalizado registrado con fotos y conformidad desde celular', 'Vidriero', 'PRESTADOR');
+      }
+
+      setCasos(prev =>
+        prev.map(c => {
+          if (c.id === casoId) {
+            return {
+              ...c,
+              costoPrestador: costoPrestador || c.costoPrestador,
+              fechaRealizacion: now.split('T')[0],
+              estadoOperativo: 'TRABAJO_REALIZADO',
+              infoExtraOperativa: obs ? `${c.infoExtraOperativa || ''}\n[PWA Vidriero]: ${obs}` : c.infoExtraOperativa,
+              fotos: [...c.fotos, ...fotosNuevas],
+              timeline: [
+                ...c.timeline,
+                {
+                  id: `t-${Date.now()}`,
+                  fecha: now,
+                  usuario: `${c.prestadorAsignado || 'Vidriero'} (PWA Móvil)`,
+                  rol: 'PRESTADOR',
+                  evento: 'TRABAJO_REALIZADO',
+                  descripcion: 'Trabajo finalizado registrado con fotos y conformidad desde celular'
+                }
+              ]
+            };
+          }
+          return c;
+        })
+      );
+
+      return true;
+    } catch (err: any) {
+      setError(err.message || 'Error al guardar finalización de trabajo.');
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const parseEmailAndCreateCaso = (mailData: {
+  const parseEmailAndCreateCaso = async (mailData: {
     aseguradora: string;
     siniestro: string;
     poliza?: string;
@@ -289,8 +333,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     tel: string;
     direccion: string;
     detalle: string;
-  }) => {
-    return addCaso({
+  }): Promise<SiniestroCaso> => {
+    return await addCaso({
       aseguradora: mailData.aseguradora,
       nroSiniestro: mailData.siniestro,
       poliza: mailData.poliza,
@@ -308,6 +352,11 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         casos,
         activeRole,
         setActiveRole,
+        loading,
+        saving,
+        error,
+        isCloudConnected: isSupabaseConfigured,
+        clearError,
         kpis,
         getCasoById,
         getCasoByToken,

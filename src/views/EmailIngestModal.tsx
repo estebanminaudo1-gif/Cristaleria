@@ -90,9 +90,9 @@ Trabajo a realizar: Espejo biselado 5mm 1200x800mm con pegado siloxano en vestid
     }, 800);
   };
 
-  const handleConfirmCreate = () => {
+  const handleConfirmCreate = async () => {
     if (!extractedResult) return;
-    const nuevo = parseEmailAndCreateCaso(extractedResult);
+    const nuevo = await parseEmailAndCreateCaso(extractedResult);
     onClose();
     onSelectCasoCreated(nuevo.id);
   };

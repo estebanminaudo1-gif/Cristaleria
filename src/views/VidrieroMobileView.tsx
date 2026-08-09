@@ -51,7 +51,7 @@ export const VidrieroMobileView: React.FC<VidrieroMobileViewProps> = ({ token, o
     setErrorMsg('');
   };
 
-  const handleSubmitTrabajo = () => {
+  const handleSubmitTrabajo = async () => {
     if (!fotoUrl) {
       setErrorMsg('⚠️ Debes tomar al menos 1 foto del trabajo realizado antes de finalizar.');
       return;
@@ -63,7 +63,7 @@ export const VidrieroMobileView: React.FC<VidrieroMobileViewProps> = ({ token, o
 
     const firmaMock = firmaDone ? 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=300&q=80' : undefined;
 
-    const ok = marcarTrabajoRealizado(
+    const ok = await marcarTrabajoRealizado(
       caso.id,
       costoPrestador,
       fotoUrl,

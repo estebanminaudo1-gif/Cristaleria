@@ -8,11 +8,13 @@ import { SiniestroDetailView } from './views/SiniestroDetailView';
 import { VidrieroMobileView } from './views/VidrieroMobileView';
 import { BillingView } from './views/BillingView';
 import { ExcelAuditView } from './views/ExcelAuditView';
+import { InternalAssistantView } from './views/InternalAssistantView';
 import { NewSiniestroModal } from './views/NewSiniestroModal';
 import { EmailIngestModal } from './views/EmailIngestModal';
+import { AlertCircle, X, CloudCheck, HardDrive } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
-  const { kpis } = useSiniestros();
+  const { kpis, error, clearError, isCloudConnected } = useSiniestros();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [selectedCasoId, setSelectedCasoId] = useState<string | null>(null);
   const [selectedVidrieroToken, setSelectedVidrieroToken] = useState<string | null>(null);
@@ -42,6 +44,19 @@ const MainAppContent: React.FC = () => {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
       />
+
+      {/* Global Error Banner */}
+      {error && (
+        <div className="bg-rose-500/20 border-b border-rose-500/40 px-4 py-2 flex items-center justify-between text-xs text-rose-300">
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button onClick={clearError} className="p-1 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Main Content Layout */}
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
@@ -74,6 +89,8 @@ const MainAppContent: React.FC = () => {
             />
           )}
 
+          {currentTab === 'asistente' && <InternalAssistantView />}
+
           {currentTab === 'detail' && selectedCasoId && (
             <SiniestroDetailView
               casoId={selectedCasoId}
@@ -96,8 +113,22 @@ const MainAppContent: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500 glass-panel mt-auto">
-        Mercado de Cristales © 2026 • Sistema de Gestión de Siniestros & Operaciones de Campo (v1.0 MVP)
+      <footer className="border-t border-slate-800/80 py-4 px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 glass-panel mt-auto gap-2">
+        <div>
+          Mercado de Cristales © 2026 • Sistema de Gestión de Siniestros & Operaciones
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isCloudConnected ? (
+            <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-semibold text-[11px]">
+              <CloudCheck className="w-3.5 h-3.5" /> Supabase Cloud Conectado
+            </span>
+          ) : (
+            <span className="text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-semibold text-[11px]" title="Configura VITE_SUPABASE_URL en tu .env para persitencia permanente">
+              <HardDrive className="w-3.5 h-3.5" /> Modo Local Demo (Memoria)
+            </span>
+          )}
+        </div>
       </footer>
 
       {/* Modals */}

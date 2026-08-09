@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FileText, Receipt, Smartphone, Bell, History } from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, Smartphone, Bell, History, Bot } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
@@ -11,6 +11,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, ale
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard 360°', icon: LayoutDashboard },
     { id: 'siniestros', label: 'Bandeja de Siniestros', icon: FileText },
+    { id: 'asistente', label: 'Asistente IA n8n', icon: Bot },
     { id: 'billing', label: 'Facturación & Retenciones', icon: Receipt },
     { id: 'vidriero', label: 'Simulador Vidriero PWA', icon: Smartphone },
     { id: 'audit', label: 'Auditoría & Planilla Excel', icon: History }
