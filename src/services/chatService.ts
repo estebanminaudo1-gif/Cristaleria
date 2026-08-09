@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+
 export interface ChatMessageItem {
   id: string;
   sender: 'user' | 'assistant';
@@ -16,46 +18,70 @@ const getSessionId = (): string => {
 };
 
 export const chatService = {
-  async sendMessageToN8n(
-    userMessage: string,
-    role = 'ADMIN',
-    userId = 'user-admin-default'
-  ): Promise<string> {
+  async sendMessageToN8n(userMessage: string): Promise<string> {
     const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL;
     const sessionId = getSessionId();
 
+    // Obtener sesión de usuario real desde Supabase Auth
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+
+    // Obtener perfil autenticado
+    let userRole = 'GUEST';
+    let userId = 'anon-user';
+    let accessToken = '';
+
+    if (session) {
+      userId = session.user.id;
+      accessToken = session.access_token;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (profile?.role) {
+        userRole = profile.role;
+      }
+    }
+
     if (!webhookUrl || webhookUrl.includes('tu-instancia')) {
-      // Fallback inteligente simulado cuando n8n no está configurado aún en el .env
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       return (
         `[Modo Simulación N8N] He recibido tu consulta: "${userMessage}". ` +
-        `Para conectarme a tu agente de IA en producción, configura la variable VITE_N8N_CHAT_WEBHOOK_URL en tu archivo .env`
+        `Para conectarme a tu agente de IA en producción, configura VITE_N8N_CHAT_WEBHOOK_URL en tu archivo .env`
       );
     }
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           chatInput: userMessage,
           sessionId,
           context: {
             userId,
-            role
+            role: userRole
           }
         })
       });
 
       if (!response.ok) {
-        throw new Error(`Servidor de n8n devolvió código ${response.status}`);
+        throw new Error(`Servidor n8n devolvió código ${response.status}`);
       }
 
       const data = await response.json();
 
-      // n8n puede devolver la respuesta en formato { output: "..." } o { response: "..." } o texto plano
       if (data.output) return data.output;
       if (data.response) return data.response;
       if (data.text) return data.text;

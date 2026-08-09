@@ -1,11 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSiniestros } from '../context/SiniestrosContext';
 import { chatService, type ChatMessageItem } from '../services/chatService';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { Bot, Send, Sparkles, HelpCircle, RefreshCw } from 'lucide-react';
 
 export const InternalAssistantView: React.FC = () => {
-  const { activeRole } = useSiniestros();
   const [messages, setMessages] = useState<ChatMessageItem[]>([
     {
       id: 'welcome',
@@ -51,7 +49,7 @@ export const InternalAssistantView: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const responseText = await chatService.sendMessageToN8n(text, activeRole);
+      const responseText = await chatService.sendMessageToN8n(text);
       const botMsg: ChatMessageItem = {
         id: `msg-${Date.now() + 1}`,
         sender: 'assistant',

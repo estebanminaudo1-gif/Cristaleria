@@ -1,18 +1,24 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import type { User } from '@supabase/supabase-js';
 import type { SiniestroCaso, EstadoOperativo, EstadoFinanciero, Role, DashboardKPIs, FotoDocumento } from '../types';
-import { initialCasos } from '../mock/initialData';
 import { casosService } from '../services/casosService';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
+const isDemoModeEnabled = import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
 
 interface SiniestrosContextType {
   casos: SiniestroCaso[];
+  user: User | null;
   activeRole: Role;
   setActiveRole: (role: Role) => void;
   loading: boolean;
   saving: boolean;
   error: string | null;
   isCloudConnected: boolean;
+  isDemoMode: boolean;
+  isSetupRequired: boolean;
   clearError: () => void;
+  logout: () => Promise<void>;
   kpis: DashboardKPIs;
   getCasoById: (id: string) => SiniestroCaso | undefined;
   getCasoByToken: (token: string) => SiniestroCaso | undefined;
@@ -28,37 +34,65 @@ interface SiniestrosContextType {
 const SiniestrosContext = createContext<SiniestrosContextType | undefined>(undefined);
 
 export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [casos, setCasos] = useState<SiniestroCaso[]>(initialCasos);
+  const [casos, setCasos] = useState<SiniestroCaso[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [activeRole, setActiveRole] = useState<Role>('ADMIN');
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isSetupRequired = !isSupabaseConfigured && !isDemoModeEnabled;
+
   const clearError = () => setError(null);
 
-  // Carga inicial de datos desde Supabase o Fallback Mock
+  // Escuchar sesión de Supabase Auth
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+      });
+
+      return () => subscription.unsubscribe();
+    }
+  }, []);
+
+  const logout = async () => {
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    setUser(null);
+  };
+
+  // Carga dinámica condicionada de casos
   useEffect(() => {
     let isMounted = true;
-    const fetchCasos = async () => {
+    const loadCasosData = async () => {
       setLoading(true);
       try {
         if (isSupabaseConfigured) {
           const data = await casosService.getCasos();
           if (isMounted) setCasos(data);
+        } else if (isDemoModeEnabled) {
+          // Carga dinámica de datos demo sanitizados solo cuando VITE_ENABLE_DEMO_MODE=true
+          const { demoCasos } = await import('../mock/demoData');
+          if (isMounted) setCasos(demoCasos);
         } else {
-          if (isMounted) setCasos(initialCasos);
+          if (isMounted) setCasos([]);
         }
       } catch (err: any) {
-        console.error('Error al cargar casos:', err);
-        if (isMounted) setError(err.message || 'No se pudieron obtener los datos de la nube.');
+        console.error('Error al cargar datos:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    fetchCasos();
+    loadCasosData();
     return () => { isMounted = false; };
-  }, []);
+  }, [user]);
 
   // Compute KPIs dynamically
   const kpis: DashboardKPIs = useMemo(() => {
@@ -172,7 +206,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: `t-${Date.now()}`,
                   fecha: now,
-                  usuario: 'Usuario Operaciones',
+                  usuario: user?.email || 'Usuario Operaciones',
                   rol: activeRole,
                   evento: 'CAMBIO_ESTADO_OPERATIVO',
                   descripcion: `Transición a ${nuevoEstado}${motivo ? `. Motivo: ${motivo}` : ''}`
@@ -210,7 +244,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: `t-${Date.now()}`,
                   fecha: now,
-                  usuario: 'Usuario Administración',
+                  usuario: user?.email || 'Usuario Administración',
                   rol: activeRole,
                   evento: 'CAMBIO_ESTADO_FINANCIERO',
                   descripcion: `Estado financiero actualizado a ${nuevoEstado}`
@@ -286,7 +320,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           estadoOperativo: 'TRABAJO_REALIZADO',
           fechaRealizacion: now.split('T')[0]
         });
-        await casosService.addEvento(casoId, 'TRABAJO_REALIZADO', 'Trabajo finalizado registrado con fotos y conformidad desde celular', 'Vidriero', 'PRESTADOR');
+        await casosService.addEvento(casoId, 'TRABAJO_REALIZADO', 'Trabajo finalizado registrado con fotos y conformidad desde celular', user?.email || 'Vidriero', 'PRESTADOR');
       }
 
       setCasos(prev =>
@@ -304,7 +338,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: `t-${Date.now()}`,
                   fecha: now,
-                  usuario: `${c.prestadorAsignado || 'Vidriero'} (PWA Móvil)`,
+                  usuario: `${user?.email || caso.prestadorAsignado || 'Vidriero'} (PWA Móvil)`,
                   rol: 'PRESTADOR',
                   evento: 'TRABAJO_REALIZADO',
                   descripcion: 'Trabajo finalizado registrado con fotos y conformidad desde celular'
@@ -350,13 +384,17 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     <SiniestrosContext.Provider
       value={{
         casos,
+        user,
         activeRole,
         setActiveRole,
         loading,
         saving,
         error,
         isCloudConnected: isSupabaseConfigured,
+        isDemoMode: isDemoModeEnabled,
+        isSetupRequired,
         clearError,
+        logout,
         kpis,
         getCasoById,
         getCasoByToken,

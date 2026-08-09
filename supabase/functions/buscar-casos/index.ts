@@ -7,51 +7,83 @@ const corsHeaders = {
   'Content-Type': 'application/json; charset=utf-8'
 };
 
+// Safe string equality helper to prevent timing attacks
+const constantTimeEquals = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+};
+
 serve(async (req: Request) => {
-  // Manejo de preflight CORS
+  // 1. RESTRICCIÓN DE MÉTODOS HTTP (Solo GET y OPTIONS)
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  try {
-    // 1. VALIDACIÓN DE AUTENTICACIÓN SEGURA DE N8N
-    const authHeader = req.headers.get('Authorization');
-    const expectedToken = Deno.env.get('N8N_SERVICE_TOKEN');
+  if (req.method !== 'GET') {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Método HTTP no permitido. Solo se aceptan solicitudes GET.' }),
+      { status: 405, headers: corsHeaders }
+    );
+  }
 
-    if (!expectedToken) {
-      console.warn('ADVERTENCIA: Secret N8N_SERVICE_TOKEN no está configurado en Supabase Edge Functions.');
-    } else {
-      const token = authHeader?.replace(/^Bearer\s+/i, '');
-      if (!token || token !== expectedToken) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Acceso no autorizado. Token de n8n no válido o ausente.' }),
-          { status: 401, headers: corsHeaders }
-        );
-      }
+  try {
+    // 2. AUTENTICACIÓN FAIL-CLOSED REQUERIDA
+    const expectedToken = Deno.env.get('N8N_SERVICE_TOKEN');
+    if (!expectedToken || expectedToken.trim() === '') {
+      // Fail-closed: rechazar si el servidor no tiene el token configurado
+      return new Response(
+        JSON.stringify({ success: false, error: 'Error de configuración del servidor: N8N_SERVICE_TOKEN no está configurado.' }),
+        { status: 503, headers: corsHeaders }
+      );
     }
 
-    // 2. Inicializar cliente Supabase con clave de servicio interna
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Acceso no autorizado: Encabezado Authorization faltante.' }),
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!token || !constantTimeEquals(token, expectedToken)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Acceso no autorizado: Token de servicio no válido.' }),
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    // 3. Inicializar Supabase Client con Service Role
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 4. SANITIZACIÓN Y VALIDACIÓN DE PARÁMETROS
     const url = new URL(req.url);
     const path = url.pathname;
-    const q = url.searchParams.get('q')?.trim();
-    const aseguradora = url.searchParams.get('aseguradora')?.trim();
-    const estado = url.searchParams.get('estado')?.trim();
-    const prestador = url.searchParams.get('prestador')?.trim();
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
 
-    // 3. ENDPOINT: Resumen Operativo (/api/resumen-operativo)
+    const q = url.searchParams.get('q')?.slice(0, 100).trim();
+    const aseguradora = url.searchParams.get('aseguradora')?.slice(0, 50).trim();
+    const estado = url.searchParams.get('estado')?.slice(0, 50).trim();
+    const prestador = url.searchParams.get('prestador')?.slice(0, 50).trim();
+
+    const rawLimit = parseInt(url.searchParams.get('limit') || '20', 10);
+    const limit = isNaN(rawLimit) ? 20 : Math.max(1, Math.min(rawLimit, 100));
+
+    // 5. ENDPOINT: Resumen Operativo (/api/resumen-operativo)
     if (path.endsWith('/resumen-operativo')) {
       const { data: casos, error } = await supabase.from('casos').select('estado_operativo, fecha_ingreso');
       if (error) throw error;
 
+      const ahora = new Date();
       const abiertos = casos.filter(c => c.estado_operativo !== 'DOCUMENTACION_COMPLETA' && c.estado_operativo !== 'CANCELADO');
       const demorados = casos.filter(c => {
         if (c.estado_operativo === 'NUEVO') {
-          const hrs = (new Date().getTime() - new Date(c.fecha_ingreso).getTime()) / (1000 * 60 * 60);
+          const hrs = (ahora.getTime() - new Date(c.fecha_ingreso).getTime()) / (1000 * 60 * 60);
           return hrs > 24;
         }
         return false;
@@ -63,52 +95,14 @@ serve(async (req: Request) => {
           resumen: {
             totalCasos: casos.length,
             casosAbiertos: abiertos.length,
-            casosDemorados: demorados.length,
-            porEstado: casos.reduce((acc: any, c) => {
-              acc[c.estado_operativo] = (acc[c.estado_operativo] || 0) + 1;
-              return acc;
-            }, {})
+            casosDemorados: demorados.length
           }
         }),
         { status: 200, headers: corsHeaders }
       );
     }
 
-    // 4. ENDPOINT: Resumen Financiero (/api/resumen-financiero)
-    if (path.endsWith('/resumen-financiero')) {
-      const { data: casos, error } = await supabase
-        .from('casos')
-        .select('monto_compania_sin_iva, monto_compania_final, costo_prestador, precio_vidrio_material, estado_financiero, monto_depositado');
-      if (error) throw error;
-
-      const facturado = casos
-        .filter(c => c.estado_financiero === 'FACTURADO')
-        .reduce((s, c) => s + Number(c.monto_compania_final || 0), 0);
-
-      const cobrado = casos
-        .filter(c => c.estado_financiero === 'COBRADO')
-        .reduce((s, c) => s + Number(c.monto_depositado || c.monto_compania_final || 0), 0);
-
-      const margenTotal = casos.reduce((s, c) => {
-        const m = Number(c.monto_compania_sin_iva || 0) - Number(c.costo_prestador || 0) - Number(c.precio_vidrio_material || 0);
-        return s + (m > 0 ? m : 0);
-      }, 0);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          resumen: {
-            totalFacturado: facturado,
-            totalCobrado: cobrado,
-            margenBrutoEstimado: margenTotal,
-            casosPendientesFacturar: casos.filter(c => c.estado_financiero === 'PENDIENTE_FACTURACION').length
-          }
-        }),
-        { status: 200, headers: corsHeaders }
-      );
-    }
-
-    // 5. BÚSQUEDA GENERAL MULTICRITERIO DE CASOS
+    // 6. BÚSQUEDA MULTICRITERIO CON FILTRO DE PRESTADOR Y DEMORADOS
     let query = supabase
       .from('casos')
       .select(`
@@ -130,53 +124,52 @@ serve(async (req: Request) => {
         nro_factura,
         fecha_ingreso,
         fecha_realizacion,
-        prestadores ( nombre )
+        prestadores ( id, nombre )
       `)
       .order('nro_trabajo', { ascending: false })
       .limit(limit);
 
-    // Filtros específicos
     if (aseguradora) query = query.ilike('aseguradora', `%${aseguradora}%`);
+
+    // Filtro por prestador
+    if (prestador) {
+      query = query.ilike('prestadores.nombre', `%${prestador}%`);
+    }
+
+    // Filtro por estado
     if (estado) {
       if (estado.toUpperCase() === 'DEMORADO') {
-        query = query.eq('estado_operativo', 'NUEVO');
+        const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.eq('estado_operativo', 'NUEVO').lt('fecha_ingreso', hace24h);
       } else {
-        query = query.or(`estado_operativo.ilike.%${estado}%,estado_financiero.ilike.%${estado}%`);
+        query = query.eq('estado_operativo', estado.toUpperCase());
       }
     }
 
-    // Búsqueda q multicriterio
+    // Filtro q multicriterio
     if (q) {
-      const isNum = !isNaN(Number(q));
+      const isNum = /^\d+$/.test(q);
       if (isNum) {
-        query = query.or(`nro_trabajo.eq.${q},nro_siniestro.ilike.%${q}%`);
+        query = query.eq('nro_trabajo', parseInt(q, 10));
       } else {
-        query = query.or(
-          `nro_siniestro.ilike.%${q}%,asegurado_nombre.ilike.%${q}%,poliza.ilike.%${q}%,aseguradora.ilike.%${q}%,asegurado_direccion.ilike.%${q}%,detalle_trabajo.ilike.%${q}%`
-        );
+        query = query.ilike('asegurado_nombre', `%${q}%`);
       }
     }
 
     const { data: casos, error } = await query;
-
     if (error) throw error;
 
-    // Formatear respuesta JSON estructurada y limpia
     const casosFormateados = (casos || []).map((c: any) => ({
       nroTrabajo: c.nro_trabajo,
       nroSiniestro: c.nro_siniestro,
       poliza: c.poliza,
       aseguradora: c.aseguradora,
       aseguradoNombre: c.asegurado_nombre,
-      aseguradoTel: c.asegurado_tel,
-      direccion: `${c.asegurado_direccion}, ${c.asegurado_ciudad}`,
       prestador: c.prestadores?.nombre || 'Sin Asignar',
-      detalleTrabajo: c.detalle_trabajo,
       estadoOperativo: c.estado_operativo,
       estadoFinanciero: c.estado_financiero,
       montoSinIva: Number(c.monto_compania_sin_iva || 0),
       montoFinal: Number(c.monto_compania_final || 0),
-      nroFactura: c.nro_factura,
       fechaIngreso: c.fecha_ingreso
     }));
 

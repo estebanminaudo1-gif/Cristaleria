@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
-import { Shield, Plus, Mail, Smartphone, Search, UserCheck } from 'lucide-react';
+import { Shield, Plus, Mail, Smartphone, Search, UserCheck, LogOut } from 'lucide-react';
 import type { Role } from '../types';
 
 interface HeaderProps {
@@ -18,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   setSearchQuery
 }) => {
-  const { activeRole, setActiveRole, casos } = useSiniestros();
+  const { activeRole, setActiveRole, casos, user, logout, isDemoMode } = useSiniestros();
 
   return (
     <header className="glass-panel sticky top-0 z-30 border-b border-slate-800 px-4 py-3">
@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={() => {
               const casoLolo = casos.find(c => c.prestadorAsignado === 'Lolo') || casos[0];
-              onSelectVidrieroToken(casoLolo.magicToken);
+              onSelectVidrieroToken(casoLolo?.magicToken || 'tok_demo');
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-medium rounded-lg shadow-md shadow-purple-500/20 transition-all"
             title="Simular acceso de Vidriero desde WhatsApp"
@@ -87,21 +87,35 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Nuevo Caso</span>
           </button>
 
-          {/* Role Switcher */}
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 ml-1">
-            <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <select
-              value={activeRole}
-              onChange={e => setActiveRole(e.target.value as Role)}
-              className="bg-transparent text-xs text-slate-200 focus:outline-none cursor-pointer"
+          {/* Role Switcher - Solamente visible en Modo Demo / Desarrollo */}
+          {isDemoMode && (
+            <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 ml-1" title="Selector de Rol activo solo en Modo Demo">
+              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+              <select
+                value={activeRole}
+                onChange={e => setActiveRole(e.target.value as Role)}
+                className="bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
+              >
+                <option value="ADMIN" className="bg-slate-900 text-slate-200">Rol Demo: Admin</option>
+                <option value="SUPERVISOR" className="bg-slate-900 text-slate-200">Rol Demo: Supervisor</option>
+                <option value="OPERATOR" className="bg-slate-900 text-slate-200">Rol Demo: Operador</option>
+                <option value="FINANCE" className="bg-slate-900 text-slate-200">Rol Demo: Finanzas</option>
+                <option value="PRESTADOR" className="bg-slate-900 text-slate-200">Rol Demo: Vidriero (PWA)</option>
+              </select>
+            </div>
+          )}
+
+          {/* Logout Button */}
+          {user && (
+            <button
+              onClick={logout}
+              className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs flex items-center gap-1 transition-all"
+              title="Cerrar Sesión"
             >
-              <option value="ADMIN" className="bg-slate-900 text-slate-200">Rol: Admin</option>
-              <option value="SUPERVISOR" className="bg-slate-900 text-slate-200">Rol: Supervisor</option>
-              <option value="OPERATOR" className="bg-slate-900 text-slate-200">Rol: Operador</option>
-              <option value="FINANCE" className="bg-slate-900 text-slate-200">Rol: Finanzas</option>
-              <option value="PRESTADOR" className="bg-slate-900 text-slate-200">Rol: Vidriero (PWA)</option>
-            </select>
-          </div>
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline font-semibold">Salir</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
