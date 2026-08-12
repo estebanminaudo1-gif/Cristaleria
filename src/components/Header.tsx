@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 ml-1" title="Selector de Rol activo solo en Modo Demo">
               <UserCheck className="w-3.5 h-3.5 text-amber-400" />
               <select
-                value={activeRole}
+                value={activeRole || 'OPERATOR'}
                 onChange={e => setActiveRole(e.target.value as Role)}
                 className="bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
               >

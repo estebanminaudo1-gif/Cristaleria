@@ -6,14 +6,25 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const isDemoModeEnabled = import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
 
+export interface UserProfile {
+  id: string;
+  nombre: string;
+  email: string;
+  role: Role;
+}
+
 interface SiniestrosContextType {
   casos: SiniestroCaso[];
   user: User | null;
-  activeRole: Role;
+  profile: UserProfile | null;
+  activeRole: Role | null;
   setActiveRole: (role: Role) => void;
   loading: boolean;
+  authLoading: boolean;
   saving: boolean;
   error: string | null;
+  unauthorizedError: string | null;
+  clearUnauthorizedError: () => void;
   isCloudConnected: boolean;
   isDemoMode: boolean;
   isSetupRequired: boolean;
@@ -36,27 +47,134 @@ const SiniestrosContext = createContext<SiniestrosContextType | undefined>(undef
 export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [casos, setCasos] = useState<SiniestroCaso[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [activeRole, setActiveRole] = useState<Role>('ADMIN');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [activeRole, setActiveRoleState] = useState<Role | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [unauthorizedError, setUnauthorizedError] = useState<string | null>(null);
 
   const isSetupRequired = !isSupabaseConfigured && !isDemoModeEnabled;
 
   const clearError = () => setError(null);
+  const clearUnauthorizedError = () => setUnauthorizedError(null);
 
-  // Escuchar sesión de Supabase Auth
+  // Permitir cambiar rol únicamente si está en modo demo explícito
+  const setActiveRole = (newRole: Role) => {
+    if (isDemoModeEnabled) {
+      setActiveRoleState(newRole);
+    }
+  };
+
+  // Función interna para verificar perfil de usuario autenticado
+  const verifyUserProfile = async (authUser: User): Promise<UserProfile | null> => {
+    try {
+      const { data: profileData, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id, nombre, email, role')
+        .eq('id', authUser.id)
+        .single();
+
+      if (profileErr || !profileData || !profileData.role) {
+        return null;
+      }
+
+      const validRoles: Role[] = ['ADMIN', 'SUPERVISOR', 'OPERATOR', 'FINANCE', 'PRESTADOR'];
+      if (!validRoles.includes(profileData.role as Role)) {
+        return null;
+      }
+
+      return {
+        id: profileData.id,
+        nombre: profileData.nombre,
+        email: profileData.email,
+        role: profileData.role as Role
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  // Manejo de la sesión de Supabase Auth
   useEffect(() => {
+    let isMounted = true;
+
     if (isSupabaseConfigured) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setUser(session?.user ?? null);
+      const initAuthSession = async () => {
+        setAuthLoading(true);
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const validProfile = await verifyUserProfile(session.user);
+            if (isMounted) {
+              if (validProfile) {
+                setUser(session.user);
+                setProfile(validProfile);
+                setActiveRoleState(validProfile.role);
+                setUnauthorizedError(null);
+              } else {
+                // Usuario no tiene perfil autorizado en public.profiles -> cerrar sesión y bloquear
+                await supabase.auth.signOut();
+                setUser(null);
+                setProfile(null);
+                setActiveRoleState(null);
+                setUnauthorizedError('Tu usuario no está autorizado para acceder a esta aplicación.');
+              }
+            }
+          } else {
+            if (isMounted) {
+              setUser(null);
+              setProfile(null);
+              setActiveRoleState(null);
+            }
+          }
+        } catch (err) {
+          console.error('Error al inicializar sesión de auth:', err);
+        } finally {
+          if (isMounted) setAuthLoading(false);
+        }
+      };
+
+      initAuthSession();
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (!isMounted) return;
+        setAuthLoading(true);
+        try {
+          if (session?.user) {
+            const validProfile = await verifyUserProfile(session.user);
+            if (validProfile) {
+              setUser(session.user);
+              setProfile(validProfile);
+              setActiveRoleState(validProfile.role);
+              setUnauthorizedError(null);
+            } else {
+              await supabase.auth.signOut();
+              setUser(null);
+              setProfile(null);
+              setActiveRoleState(null);
+              setUnauthorizedError('Tu usuario no está autorizado para acceder a esta aplicación.');
+            }
+          } else {
+            setUser(null);
+            setProfile(null);
+            setActiveRoleState(null);
+          }
+        } finally {
+          setAuthLoading(false);
+        }
       });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null);
-      });
-
-      return () => subscription.unsubscribe();
+      return () => {
+        isMounted = false;
+        subscription.unsubscribe();
+      };
+    } else {
+      if (isDemoModeEnabled) {
+        setActiveRoleState('ADMIN');
+      }
+      setAuthLoading(false);
     }
   }, []);
 
@@ -65,19 +183,25 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       await supabase.auth.signOut();
     }
     setUser(null);
+    setProfile(null);
+    setActiveRoleState(null);
+    setUnauthorizedError(null);
   };
 
-  // Carga dinámica condicionada de casos
+  // Carga de casos desde Supabase
   useEffect(() => {
     let isMounted = true;
     const loadCasosData = async () => {
       setLoading(true);
       try {
         if (isSupabaseConfigured) {
-          const data = await casosService.getCasos();
-          if (isMounted) setCasos(data);
+          if (user && profile) {
+            const data = await casosService.getCasos();
+            if (isMounted) setCasos(data);
+          } else {
+            if (isMounted) setCasos([]);
+          }
         } else if (isDemoModeEnabled) {
-          // Carga dinámica de datos demo sanitizados solo cuando VITE_ENABLE_DEMO_MODE=true
           const { demoCasos } = await import('../mock/demoData');
           if (isMounted) setCasos(demoCasos);
         } else {
@@ -85,6 +209,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       } catch (err: any) {
         console.error('Error al cargar datos:', err);
+        if (isMounted) setError(err.message || 'Error al obtener siniestros.');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -92,7 +217,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     loadCasosData();
     return () => { isMounted = false; };
-  }, [user]);
+  }, [user, profile]);
 
   // Compute KPIs dynamically
   const kpis: DashboardKPIs = useMemo(() => {
@@ -206,8 +331,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: `t-${Date.now()}`,
                   fecha: now,
-                  usuario: user?.email || 'Usuario Operaciones',
-                  rol: activeRole,
+                  usuario: profile?.nombre || user?.email || 'Usuario Operaciones',
+                  rol: activeRole || 'OPERATOR',
                   evento: 'CAMBIO_ESTADO_OPERATIVO',
                   descripcion: `Transición a ${nuevoEstado}${motivo ? `. Motivo: ${motivo}` : ''}`
                 }
@@ -244,8 +369,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: `t-${Date.now()}`,
                   fecha: now,
-                  usuario: user?.email || 'Usuario Administración',
-                  rol: activeRole,
+                  usuario: profile?.nombre || user?.email || 'Usuario Administración',
+                  rol: activeRole || 'FINANCE',
                   evento: 'CAMBIO_ESTADO_FINANCIERO',
                   descripcion: `Estado financiero actualizado a ${nuevoEstado}`
                 }
@@ -320,7 +445,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           estadoOperativo: 'TRABAJO_REALIZADO',
           fechaRealizacion: now.split('T')[0]
         });
-        await casosService.addEvento(casoId, 'TRABAJO_REALIZADO', 'Trabajo finalizado registrado con fotos y conformidad desde celular', user?.email || 'Vidriero', 'PRESTADOR');
+        await casosService.addEvento(casoId, 'TRABAJO_REALIZADO', 'Trabajo finalizado registrado con fotos y conformidad desde celular', profile?.nombre || user?.email || 'Vidriero', 'PRESTADOR');
       }
 
       setCasos(prev =>
@@ -338,7 +463,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: `t-${Date.now()}`,
                   fecha: now,
-                  usuario: `${user?.email || caso.prestadorAsignado || 'Vidriero'} (PWA Móvil)`,
+                  usuario: `${profile?.nombre || user?.email || caso.prestadorAsignado || 'Vidriero'} (PWA Móvil)`,
                   rol: 'PRESTADOR',
                   evento: 'TRABAJO_REALIZADO',
                   descripcion: 'Trabajo finalizado registrado con fotos y conformidad desde celular'
@@ -385,11 +510,15 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       value={{
         casos,
         user,
-        activeRole,
+        profile,
+        activeRole: activeRole || 'OPERATOR',
         setActiveRole,
         loading,
+        authLoading,
         saving,
         error,
+        unauthorizedError,
+        clearUnauthorizedError,
         isCloudConnected: isSupabaseConfigured,
         isDemoMode: isDemoModeEnabled,
         isSetupRequired,

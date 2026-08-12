@@ -16,14 +16,15 @@ if (!isSupabaseConfigured) {
   );
 }
 
-// Inicialización del cliente Supabase con anon key pública
+// Inicialización del cliente Supabase con anon key pública y detección de la sesión por URL (Magic Link)
 export const supabase = createClient(
   isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
   isSupabaseConfigured ? supabaseAnonKey : 'placeholder-anon-key',
   {
     auth: {
       persistSession: true,
-      autoRefreshToken: true
+      autoRefreshToken: true,
+      detectSessionInUrl: true
     }
   }
 );
