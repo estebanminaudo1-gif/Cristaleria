@@ -8,6 +8,8 @@ export interface ChatMessageItem {
   isError?: boolean;
 }
 
+const DEFAULT_N8N_WEBHOOK = 'http://localhost:5678/webhook/e01e03b4-c954-4a5e-b83a-f69b0c084886/chat';
+
 const getSessionId = (): string => {
   let sid = localStorage.getItem('mercado_cristales_chat_session');
   if (!sid) {
@@ -19,7 +21,7 @@ const getSessionId = (): string => {
 
 export const chatService = {
   async sendMessageToN8n(userMessage: string): Promise<string> {
-    const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL;
+    const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL || DEFAULT_N8N_WEBHOOK;
     const sessionId = getSessionId();
 
     // Obtener sesión de usuario real desde Supabase Auth
@@ -44,14 +46,6 @@ export const chatService = {
       if (profile?.role) {
         userRole = profile.role;
       }
-    }
-
-    if (!webhookUrl || webhookUrl.includes('tu-instancia')) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return (
-        `[Modo Simulación N8N] He recibido tu consulta: "${userMessage}". ` +
-        `Para conectarme a tu agente de IA en producción, configura VITE_N8N_CHAT_WEBHOOK_URL en tu archivo .env`
-      );
     }
 
     try {
