@@ -38,6 +38,7 @@ interface SiniestrosContextType {
   changeEstadoOperativo: (id: string, estado: EstadoOperativo, motivo?: string) => Promise<void>;
   changeEstadoFinanciero: (id: string, estado: EstadoFinanciero) => Promise<void>;
   addFotoToCaso: (casoId: string, foto: Omit<FotoDocumento, 'id'>) => Promise<void>;
+  removeFotoFromCaso: (casoId: string, fotoId: string) => Promise<void>;
   marcarTrabajoRealizado: (casoId: string, costoPrestador: number, fotoUrl: string, firmaUrl?: string, obs?: string) => Promise<boolean>;
   parseEmailAndCreateCaso: (mailData: { aseguradora: string; siniestro: string; poliza?: string; asegurado: string; tel: string; direccion: string; detalle: string }) => Promise<SiniestroCaso>;
 }
@@ -390,7 +391,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const addFotoToCaso = async (casoId: string, fotoData: Omit<FotoDocumento, 'id'>): Promise<void> => {
     const nuevaFoto: FotoDocumento = {
       ...fotoData,
-      id: `foto-${Date.now()}`
+      id: `foto-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
     };
 
     setCasos(prev =>
@@ -399,6 +400,20 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return {
             ...c,
             fotos: [...c.fotos, nuevaFoto]
+          };
+        }
+        return c;
+      })
+    );
+  };
+
+  const removeFotoFromCaso = async (casoId: string, fotoId: string): Promise<void> => {
+    setCasos(prev =>
+      prev.map(c => {
+        if (c.id === casoId) {
+          return {
+            ...c,
+            fotos: c.fotos.filter(f => f.id !== fotoId)
           };
         }
         return c;
@@ -532,6 +547,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         changeEstadoOperativo,
         changeEstadoFinanciero,
         addFotoToCaso,
+        removeFotoFromCaso,
         marcarTrabajoRealizado,
         parseEmailAndCreateCaso
       }}

@@ -35,6 +35,7 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
     changeEstadoFinanciero,
     updateCaso,
     addFotoToCaso,
+    removeFotoFromCaso,
     marcarTrabajoRealizado,
     profile,
     user
@@ -125,24 +126,27 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
+    const filesToUpload = Array.from(fileList);
     setIsUploading(true);
     setUploadError(null);
 
     try {
       const uploaderName = profile?.nombre || user?.email || 'Operador Oficina';
-      const uploadedDoc = await documentosService.uploadDocumento(caso.id, file, uploadTipo, uploaderName);
-      await addFotoToCaso(caso.id, {
-        tipo: uploadedDoc.tipo,
-        url: uploadedDoc.url,
-        subidoPor: uploadedDoc.subidoPor,
-        fecha: uploadedDoc.fecha
-      });
+      for (const file of filesToUpload) {
+        const uploadedDoc = await documentosService.uploadDocumento(caso.id, file, uploadTipo, uploaderName);
+        await addFotoToCaso(caso.id, {
+          tipo: uploadedDoc.tipo,
+          url: uploadedDoc.url,
+          subidoPor: uploadedDoc.subidoPor,
+          fecha: uploadedDoc.fecha
+        });
+      }
     } catch (err: any) {
-      console.error('Error al subir documento:', err);
-      setUploadError(err.message || 'Error al subir la imagen.');
+      console.error('Error al subir documentos:', err);
+      setUploadError(err.message || 'Error al subir una o más imágenes.');
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -582,10 +586,11 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
               </div>
 
               <div className="w-full sm:flex-1">
-                <label className="text-slate-400 block text-[10px] mb-1">Seleccionar Imagen (JPG, PNG, WEBP, PDF)</label>
+                <label className="text-slate-400 block text-[10px] mb-1">Seleccionar una o varias imágenes (JPG, PNG, WEBP, PDF - Hasta 10+ fotos)</label>
                 <input
                   type="file"
                   accept="image/*,.pdf"
+                  multiple
                   onChange={handleFileUpload}
                   disabled={isUploading}
                   className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer bg-slate-950 border border-slate-700 rounded-lg p-1"
@@ -595,7 +600,7 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
 
             {isUploading && (
               <div className="text-xs text-cyan-400 font-semibold animate-pulse">
-                Subiendo archivo a Supabase Storage...
+                Subiendo imágenes a la nube de Supabase Storage...
               </div>
             )}
           </div>
@@ -603,17 +608,24 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
           {/* Galería de Archivos */}
           {caso.fotos.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl">
-              Sin fotos cargadas. Suba imágenes usando el formulario superior.
+              Sin fotos cargadas. Suba imágenes (hasta 10+ por caso) usando el selector múltiple superior.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {caso.fotos.map(foto => (
-                <div key={foto.id} className="glass-card p-3 rounded-xl border border-slate-800 space-y-2">
+                <div key={foto.id} className="glass-card p-3 rounded-xl border border-slate-800 space-y-2 relative group">
                   <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900 border border-slate-800">
                     <img src={foto.url} alt={foto.tipo} className="w-full h-full object-cover" />
                     <span className="absolute top-2 left-2 bg-slate-900/90 text-slate-200 border border-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
                       {foto.tipo}
                     </span>
+                    <button
+                      onClick={() => removeFotoFromCaso(caso.id, foto.id)}
+                      className="absolute top-2 right-2 p-1.5 bg-slate-900/80 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-all border border-slate-700"
+                      title="Eliminar foto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
                     <span>Subido por: <strong>{foto.subidoPor}</strong></span>
