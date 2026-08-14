@@ -3,6 +3,22 @@
 @layer base {
   :root {
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* n8n Chat Theme Variables */
+    --chat--color-primary: #0891b2;
+    --chat--color-primary-shade-50: #06b6d4;
+    --chat--color-primary-shade-100: #22d3ee;
+    --chat--color-secondary: #1e293b;
+    --chat--color-white: #020617;
+    --chat--color-light: #0f172a;
+    --chat--color-light-shade-50: #1e293b;
+    --chat--color-medium: #334155;
+    --chat--color-dark: #f8fafc;
+    --chat--color-disabled: #475569;
+    --chat--color-typing: #38bdf8;
+    --chat--border-radius: 12px;
+    --chat--header-height: 56px;
+    --chat--background: #020617;
   }
   
   body {
@@ -49,3 +65,41 @@ canvas {
   touch-action: none;
 }
 
+/* n8n Chat Full Dark Theme Overrides */
+.n8n-chat,
+div[class*="chat-"] {
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+  border-color: #1e293b !important;
+}
+
+div[class*="chat-header"],
+header[class*="chat"] {
+  background-color: #0f172a !important;
+  border-bottom: 1px solid #1e293b !important;
+  color: #ffffff !important;
+}
+
+div[class*="chat-footer"],
+div[class*="chat-input"] {
+  background-color: #0f172a !important;
+  border-top: 1px solid #1e293b !important;
+}
+
+textarea[class*="chat-"],
+input[class*="chat-"] {
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+}
+
+div[class*="chat-message"] {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-radius: 12px !important;
+}
+
+div[class*="chat-message-from-user"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}

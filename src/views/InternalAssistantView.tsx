@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Bot, RefreshCw } from 'lucide-react';
 
 const loadN8nModule = async (): Promise<{ createChat: (config: any) => void }> => {
@@ -18,6 +18,27 @@ export const InternalAssistantView: React.FC = () => {
     import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL ||
     'http://localhost:5678/webhook/e01e03b4-c954-4a5e-b83a-f69b0c084886/chat';
 
+  const chatConfig = useMemo(() => ({
+    webhookUrl,
+    mode: 'fullscreen',
+    showWelcomeScreen: false,
+    initialMessages: [
+      '¡Hola! Soy el asistente IA de Mercado de Cristales. Podés preguntarme el estado de cualquier siniestro, consultar montos pendientes de cobro, revisar la agenda de prestadores o buscar casos por aseguradora.'
+    ],
+    i18n: {
+      en: {
+        title: 'Asistente IA Mercado de Cristales',
+        subtitle: 'Consultas operativas en tiempo real',
+        inputPlaceholder: 'Escribí tu consulta sobre casos, cobros o prestadores...'
+      },
+      es: {
+        title: 'Asistente IA Mercado de Cristales',
+        subtitle: 'Consultas operativas en tiempo real',
+        inputPlaceholder: 'Escribí tu consulta sobre casos, cobros o prestadores...'
+      }
+    }
+  }), [webhookUrl]);
+
   useEffect(() => {
     let isMounted = true;
     const elem = containerRef.current;
@@ -32,13 +53,8 @@ export const InternalAssistantView: React.FC = () => {
         if (!isMounted || !elem) return;
 
         module.createChat({
-          target: elem,
-          webhookUrl,
-          mode: 'fullscreen',
-          showWelcomeScreen: true,
-          initialMessages: [
-            '¡Hola! Soy el asistente IA de Mercado de Cristales. Podés preguntarme el estado de cualquier siniestro, consultar montos pendientes de cobro, revisar la agenda de prestadores o buscar casos por aseguradora.'
-          ]
+          ...chatConfig,
+          target: elem
         });
       } catch (err: any) {
         console.error('Error al cargar n8n chat:', err);
@@ -56,7 +72,7 @@ export const InternalAssistantView: React.FC = () => {
         elem.innerHTML = '';
       }
     };
-  }, [webhookUrl]);
+  }, [webhookUrl, chatConfig]);
 
   const handleReset = async () => {
     if (containerRef.current) {
@@ -65,13 +81,8 @@ export const InternalAssistantView: React.FC = () => {
         const module = await loadN8nModule();
         if (containerRef.current) {
           module.createChat({
-            target: containerRef.current,
-            webhookUrl,
-            mode: 'fullscreen',
-            showWelcomeScreen: true,
-            initialMessages: [
-              '¡Hola! Soy el asistente IA de Mercado de Cristales. Podés preguntarme el estado de cualquier siniestro, consultar montos pendientes de cobro, revisar la agenda de prestadores o buscar casos por aseguradora.'
-            ]
+            ...chatConfig,
+            target: containerRef.current
           });
         }
       } catch (e: any) {
@@ -81,7 +92,7 @@ export const InternalAssistantView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] glass-panel rounded-2xl border border-slate-800 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-120px)] glass-panel rounded-2xl border border-slate-800 overflow-hidden bg-slate-950">
       {/* Header Panel */}
       <div className="bg-slate-900/90 border-b border-slate-800 p-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -112,13 +123,13 @@ export const InternalAssistantView: React.FC = () => {
       </div>
 
       {/* Embedded n8n Chat Area */}
-      <div className="flex-1 w-full h-full relative bg-slate-950/60 overflow-hidden">
+      <div className="flex-1 w-full h-full relative bg-slate-950 overflow-hidden">
         {chatError && (
           <div className="p-4 text-xs text-rose-400 font-semibold text-center">
             {chatError}
           </div>
         )}
-        <div ref={containerRef} className="w-full h-full text-slate-100" />
+        <div ref={containerRef} className="w-full h-full text-slate-100 bg-slate-950" />
       </div>
     </div>
   );
