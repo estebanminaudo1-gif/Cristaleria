@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
 import { X, Plus } from 'lucide-react';
 
@@ -22,7 +22,32 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
   const [montoCompaniaSinIva, setMontoCompaniaSinIva] = useState<number>(0);
   const [costoPrestador, setCostoPrestador] = useState<number>(0);
 
+  const resetForm = () => {
+    setAseguradora('BBVA');
+    setNroSiniestro('');
+    setPoliza('');
+    setAseguradoNombre('');
+    setAseguradoTel('');
+    setAseguradoDireccion('');
+    setAseguradoCiudad('Mar del Plata');
+    setPrestadorAsignado('Lolo');
+    setDetalleTrabajo('');
+    setMontoCompaniaSinIva(0);
+    setCostoPrestador(0);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +65,8 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
       montoCompaniaSinIva,
       costoPrestador
     });
-    onClose();
+
+    handleClose();
   };
 
   return (
@@ -51,7 +77,7 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
             <Plus className="w-5 h-5 text-cyan-400" />
             <h3 className="text-base font-bold text-white uppercase tracking-wider">Crear Nuevo Siniestro</h3>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
+          <button onClick={handleClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -198,7 +224,7 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg"
             >
               Cancelar
