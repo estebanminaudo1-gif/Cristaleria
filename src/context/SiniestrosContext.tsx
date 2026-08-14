@@ -5,6 +5,7 @@ import { casosService } from '../services/casosService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const isDemoModeEnabled = import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
+const LOCAL_STORAGE_KEY = 'mercado_cristales_casos_v1';
 
 export interface UserProfile {
   id: string;
@@ -115,7 +116,6 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 setActiveRoleState(validProfile.role);
                 setUnauthorizedError(null);
               } else {
-                // Usuario no tiene perfil autorizado en public.profiles -> cerrar sesión y bloquear
                 await supabase.auth.signOut();
                 setUser(null);
                 setProfile(null);
@@ -189,7 +189,7 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setUnauthorizedError(null);
   };
 
-  // Carga de casos desde Supabase
+  // Carga e inicialización de datos con persistencia en localStorage o Supabase
   useEffect(() => {
     let isMounted = true;
     const loadCasosData = async () => {
@@ -203,8 +203,26 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             if (isMounted) setCasos([]);
           }
         } else if (isDemoModeEnabled) {
+          // Intentar restaurar desde localStorage en modo demo
+          const localStored = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (localStored) {
+            try {
+              const parsed = JSON.parse(localStored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                if (isMounted) setCasos(parsed);
+                return;
+              }
+            } catch (e) {
+              console.error('Error leyendo localStorage:', e);
+            }
+          }
+
+          // Carga inicial de datos demo sanitizados si no hay localStorage previo
           const { demoCasos } = await import('../mock/demoData');
-          if (isMounted) setCasos(demoCasos);
+          if (isMounted) {
+            setCasos(demoCasos);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(demoCasos));
+          }
         } else {
           if (isMounted) setCasos([]);
         }
@@ -219,6 +237,17 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     loadCasosData();
     return () => { isMounted = false; };
   }, [user, profile]);
+
+  // Persistir automáticamente cualquier cambio en localStorage en modo local/demo
+  useEffect(() => {
+    if (!isSupabaseConfigured && casos.length > 0) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(casos));
+      } catch (e) {
+        console.error('Error guardando en localStorage:', e);
+      }
+    }
+  }, [casos]);
 
   // Compute KPIs dynamically
   const kpis: DashboardKPIs = useMemo(() => {
@@ -273,7 +302,13 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setSaving(true);
     try {
       const nuevo = await casosService.createCaso(casoData);
-      setCasos(prev => [nuevo, ...prev]);
+      setCasos(prev => {
+        const updated = [nuevo, ...prev];
+        if (!isSupabaseConfigured) {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      });
       return nuevo;
     } catch (err: any) {
       setError(err.message || 'Error al guardar el siniestro.');
@@ -289,8 +324,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (isSupabaseConfigured) {
         await casosService.updateCaso(id, partial);
       }
-      setCasos(prev =>
-        prev.map(c => {
+      setCasos(prev => {
+        const updated = prev.map(c => {
           if (c.id === id) {
             const sinIva = partial.montoCompaniaSinIva !== undefined ? partial.montoCompaniaSinIva : c.montoCompaniaSinIva;
             const finalConIva = sinIva * 1.21;
@@ -302,8 +337,12 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             };
           }
           return c;
-        })
-      );
+        });
+        if (!isSupabaseConfigured) {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      });
     } catch (err: any) {
       setError(err.message || 'Error al actualizar el caso.');
     } finally {
@@ -320,8 +359,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         await casosService.addEvento(id, 'CAMBIO_ESTADO_OPERATIVO', `Transición a ${nuevoEstado}${motivo ? `. Motivo: ${motivo}` : ''}`);
       }
 
-      setCasos(prev =>
-        prev.map(c => {
+      setCasos(prev => {
+        const updated = prev.map(c => {
           if (c.id === id) {
             return {
               ...c,
@@ -341,8 +380,12 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             };
           }
           return c;
-        })
-      );
+        });
+        if (!isSupabaseConfigured) {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      });
     } catch (err: any) {
       setError(err.message || 'Error al actualizar estado operativo.');
     } finally {
@@ -359,8 +402,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         await casosService.addEvento(id, 'CAMBIO_ESTADO_FINANCIERO', `Estado financiero actualizado a ${nuevoEstado}`);
       }
 
-      setCasos(prev =>
-        prev.map(c => {
+      setCasos(prev => {
+        const updated = prev.map(c => {
           if (c.id === id) {
             return {
               ...c,
@@ -379,8 +422,12 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             };
           }
           return c;
-        })
-      );
+        });
+        if (!isSupabaseConfigured) {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      });
     } catch (err: any) {
       setError(err.message || 'Error al actualizar estado financiero.');
     } finally {
@@ -394,8 +441,8 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       id: `foto-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
     };
 
-    setCasos(prev =>
-      prev.map(c => {
+    setCasos(prev => {
+      const updated = prev.map(c => {
         if (c.id === casoId) {
           return {
             ...c,
@@ -403,13 +450,17 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           };
         }
         return c;
-      })
-    );
+      });
+      if (!isSupabaseConfigured) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const removeFotoFromCaso = async (casoId: string, fotoId: string): Promise<void> => {
-    setCasos(prev =>
-      prev.map(c => {
+    setCasos(prev => {
+      const updated = prev.map(c => {
         if (c.id === casoId) {
           return {
             ...c,
@@ -417,8 +468,12 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           };
         }
         return c;
-      })
-    );
+      });
+      if (!isSupabaseConfigured) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const marcarTrabajoRealizado = async (
@@ -463,14 +518,14 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         await casosService.addEvento(casoId, 'TRABAJO_REALIZADO', 'Trabajo finalizado registrado con fotos y conformidad desde celular', profile?.nombre || user?.email || 'Vidriero', 'PRESTADOR');
       }
 
-      setCasos(prev =>
-        prev.map(c => {
+      setCasos(prev => {
+        const updated = prev.map(c => {
           if (c.id === casoId) {
             return {
               ...c,
               costoPrestador: costoPrestador || c.costoPrestador,
               fechaRealizacion: now.split('T')[0],
-              estadoOperativo: 'TRABAJO_REALIZADO',
+              estadoOperativo: 'TRABAJO_REALIZADO' as EstadoOperativo,
               infoExtraOperativa: obs ? `${c.infoExtraOperativa || ''}\n[PWA Vidriero]: ${obs}` : c.infoExtraOperativa,
               fotos: [...c.fotos, ...fotosNuevas],
               timeline: [
@@ -487,8 +542,12 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             };
           }
           return c;
-        })
-      );
+        });
+        if (!isSupabaseConfigured) {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      });
 
       return true;
     } catch (err: any) {
