@@ -2,20 +2,18 @@ import React from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
 import { KPICards } from '../components/KPICards';
 import { BadgeEstado } from '../components/BadgeEstado';
-import { Clock, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, CheckCircle, FileSpreadsheet } from 'lucide-react';
+import { Clock, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle, FileSpreadsheet } from 'lucide-react';
 
 interface DashboardViewProps {
   onSelectCaso: (id: string) => void;
   onOpenNewModal: () => void;
   onOpenEmailModal: () => void;
-  onOpenVidrieroPWA: (token: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectCaso,
   onOpenNewModal,
-  onOpenEmailModal,
-  onOpenVidrieroPWA
+  onOpenEmailModal
 }) => {
   const { casos } = useSiniestros();
 
@@ -166,38 +164,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Timeline de Actividad & Accesos a PWA Vidriero */}
+        {/* Right Column: Timeline de Actividad */}
         <div className="space-y-6">
-          {/* Quick Vidriero Mobile Access */}
-          <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 bg-gradient-to-br from-slate-900 via-purple-950/20 to-slate-900">
-            <div className="flex items-center gap-2 mb-3">
-              <Smartphone className="w-5 h-5 text-purple-400" />
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Simulador PWA Vidriero
-              </h3>
-            </div>
-            <p className="text-xs text-slate-300 mb-4">
-              Probá cómo ve y reporta los trabajos de campo el prestador desde WhatsApp mediante un enlace de token mágico.
-            </p>
-            <div className="space-y-2">
-              {casos.slice(0, 3).map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => onOpenVidrieroPWA(c.magicToken)}
-                  className="w-full flex items-center justify-between p-2.5 bg-slate-900/80 hover:bg-purple-900/30 border border-purple-500/20 rounded-xl text-left transition-all text-xs"
-                >
-                  <div>
-                    <span className="font-bold text-purple-300">Nº {c.nroTrabajo}</span> - {c.aseguradoNombre}
-                    <div className="text-[10px] text-slate-400">Token: {c.magicToken}</div>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
-                    Probar PWA
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Live Activity Timeline */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-800">
             <div className="flex items-center justify-between mb-4">

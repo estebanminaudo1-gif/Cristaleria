@@ -1,12 +1,11 @@
 import React from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
-import { Shield, Plus, Mail, Smartphone, Search, UserCheck, LogOut } from 'lucide-react';
+import { Shield, Plus, Mail, Search, UserCheck, LogOut } from 'lucide-react';
 import type { Role } from '../types';
 
 interface HeaderProps {
   onOpenNewModal: () => void;
   onOpenEmailModal: () => void;
-  onSelectVidrieroToken: (token: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 }
@@ -14,11 +13,10 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenNewModal,
   onOpenEmailModal,
-  onSelectVidrieroToken,
   searchQuery,
   setSearchQuery
 }) => {
-  const { activeRole, setActiveRole, casos, user, logout, isDemoMode } = useSiniestros();
+  const { activeRole, setActiveRole, user, logout, isDemoMode } = useSiniestros();
 
   return (
     <header className="glass-panel sticky top-0 z-30 border-b border-slate-800 px-4 py-3">
@@ -53,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Action Controls & Role Switcher */}
+        {/* Action Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Email Parsing Simulation */}
           <button
@@ -63,19 +61,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Mail className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden sm:inline">Parsear Email</span>
-          </button>
-
-          {/* Vidriero PWA Simulator */}
-          <button
-            onClick={() => {
-              const casoLolo = casos.find(c => c.prestadorAsignado === 'Lolo') || casos[0];
-              onSelectVidrieroToken(casoLolo?.magicToken || 'tok_demo');
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-medium rounded-lg shadow-md shadow-purple-500/20 transition-all"
-            title="Simular acceso de Vidriero desde WhatsApp"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Ver PWA Vidriero</span>
           </button>
 
           {/* New Claim */}

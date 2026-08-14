@@ -5,7 +5,6 @@ import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './views/DashboardView';
 import { SiniestrosListView } from './views/SiniestrosListView';
 import { SiniestroDetailView } from './views/SiniestroDetailView';
-import { VidrieroMobileView } from './views/VidrieroMobileView';
 import { BillingView } from './views/BillingView';
 import { ExcelAuditView } from './views/ExcelAuditView';
 import { InternalAssistantView } from './views/InternalAssistantView';
@@ -32,7 +31,6 @@ const MainAppContent: React.FC = () => {
 
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [selectedCasoId, setSelectedCasoId] = useState<string | null>(null);
-  const [selectedVidrieroToken, setSelectedVidrieroToken] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Modals state
@@ -42,11 +40,6 @@ const MainAppContent: React.FC = () => {
   const handleOpenCaso = (id: string) => {
     setSelectedCasoId(id);
     setCurrentTab('detail');
-  };
-
-  const handleOpenVidrieroPWA = (token: string) => {
-    setSelectedVidrieroToken(token);
-    setCurrentTab('vidriero');
   };
 
   // 1. Si Supabase no está configurado y el modo demo no está activo, mostrar pantalla de configuración
@@ -85,7 +78,6 @@ const MainAppContent: React.FC = () => {
       <Header
         onOpenNewModal={() => setIsNewModalOpen(true)}
         onOpenEmailModal={() => setIsEmailModalOpen(true)}
-        onSelectVidrieroToken={handleOpenVidrieroPWA}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
       />
@@ -106,13 +98,11 @@ const MainAppContent: React.FC = () => {
       {/* Main Content Layout */}
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
         {/* Sidebar Navigation */}
-        {currentTab !== 'vidriero' && (
-          <Sidebar
-            currentTab={currentTab}
-            setCurrentTab={setCurrentTab}
-            alertCount={kpis.demoradosMas48h}
-          />
-        )}
+        <Sidebar
+          currentTab={currentTab}
+          setCurrentTab={setCurrentTab}
+          alertCount={kpis.demoradosMas48h}
+        />
 
         {/* Dynamic View Display */}
         <main className="flex-1 min-w-0">
@@ -121,7 +111,6 @@ const MainAppContent: React.FC = () => {
               onSelectCaso={handleOpenCaso}
               onOpenNewModal={() => setIsNewModalOpen(true)}
               onOpenEmailModal={() => setIsEmailModalOpen(true)}
-              onOpenVidrieroPWA={handleOpenVidrieroPWA}
             />
           )}
 
@@ -140,18 +129,10 @@ const MainAppContent: React.FC = () => {
             <SiniestroDetailView
               casoId={selectedCasoId}
               onBack={() => setCurrentTab('siniestros')}
-              onOpenVidrieroPWA={handleOpenVidrieroPWA}
             />
           )}
 
           {currentTab === 'billing' && <BillingView />}
-
-          {currentTab === 'vidriero' && (
-            <VidrieroMobileView
-              token={selectedVidrieroToken || 'tok_demo'}
-              onBack={() => setCurrentTab('dashboard')}
-            />
-          )}
 
           {currentTab === 'audit' && <ExcelAuditView />}
         </main>

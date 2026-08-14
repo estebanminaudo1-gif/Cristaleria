@@ -1,21 +1,45 @@
 import React, { useState } from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
 import { BadgeEstado } from '../components/BadgeEstado';
-import { ArrowLeft, MapPin, Calendar, User, Shield, MessageSquare, DollarSign, Image, Clock, Smartphone, AlertCircle } from 'lucide-react';
-import type { EstadoOperativo, EstadoFinanciero } from '../types';
+import { documentosService } from '../services/documentosService';
+import {
+  ArrowLeft,
+  MapPin,
+  User,
+  Shield,
+  MessageSquare,
+  DollarSign,
+  Image as ImageIcon,
+  Clock,
+  AlertCircle,
+  Plus,
+  Upload,
+  CheckCircle2,
+  Trash2,
+  FileCheck
+} from 'lucide-react';
+import type { EstadoOperativo, EstadoFinanciero, ItemTrabajo } from '../types';
 
 interface SiniestroDetailViewProps {
   casoId: string;
   onBack: () => void;
-  onOpenVidrieroPWA: (token: string) => void;
 }
 
 export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
   casoId,
-  onBack,
-  onOpenVidrieroPWA
+  onBack
 }) => {
-  const { getCasoById, changeEstadoOperativo, changeEstadoFinanciero, updateCaso } = useSiniestros();
+  const {
+    getCasoById,
+    changeEstadoOperativo,
+    changeEstadoFinanciero,
+    updateCaso,
+    addFotoToCaso,
+    marcarTrabajoRealizado,
+    profile,
+    user
+  } = useSiniestros();
+
   const caso = getCasoById(casoId);
   const [activeTab, setActiveTab] = useState<'operacion' | 'medidas' | 'fotos' | 'finanzas' | 'timeline'>('operacion');
 
@@ -23,11 +47,30 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
   const [editingFinances, setEditingFinances] = useState(false);
   const [montoSinIvaInput, setMontoSinIvaInput] = useState<number>(caso?.montoCompaniaSinIva || 0);
   const [costoPrestadorInput, setCostoPrestadorInput] = useState<number>(caso?.costoPrestador || 0);
-  const [precioVidrioInput] = useState<number>(caso?.precioVidrioMaterial || 0);
-  const [nroFacturaInput] = useState<string>(caso?.nroFactura || '');
+  const [precioVidrioInput, setPrecioVidrioInput] = useState<number>(caso?.precioVidrioMaterial || 0);
+  const [nroFacturaInput, setNroFacturaInput] = useState<string>(caso?.nroFactura || '');
   const [retIvaInput, setRetIvaInput] = useState<number>(caso?.retencionIva || 0);
   const [retGciasInput, setRetGciasInput] = useState<number>(caso?.retencionGanancias || 0);
   const [retIibbInput, setRetIibbInput] = useState<number>(caso?.retencionIibb || 0);
+
+  // States for adding glass item directly in office
+  const [showAddItemForm, setShowAddItemForm] = useState(false);
+  const [nuevoItemTipo, setNuevoItemTipo] = useState('Vidrio Float 4mm');
+  const [nuevoItemAncho, setNuevoItemAncho] = useState<number>(500);
+  const [nuevoItemAlto, setNuevoItemAlto] = useState<number>(500);
+  const [nuevoItemEspesor, setNuevoItemEspesor] = useState<number>(4);
+  const [nuevoItemDetalles, setNuevoItemDetalles] = useState('');
+  const [nuevoItemCantidad, setNuevoItemCantidad] = useState<number>(1);
+
+  // States for uploading photo directly in office
+  const [uploadTipo, setUploadTipo] = useState<'FOTO_ANTES' | 'FOTO_DESPUES' | 'FIRMA_CONFORMIDAD' | 'REMITO'>('FOTO_ANTES');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // States for marking work done from office
+  const [obsTrabajoOficina, setObsTrabajoOficina] = useState('');
+  const [isSavingTrabajo, setIsSavingTrabajo] = useState(false);
+  const [trabajoCompletadoExito, setTrabajoCompletadoExito] = useState(false);
 
   if (!caso) {
     return (
@@ -59,8 +102,74 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
     setEditingFinances(false);
   };
 
+  const handleAddItem = () => {
+    const newItem: ItemTrabajo = {
+      id: `item-${Date.now()}`,
+      tipoArticulo: nuevoItemTipo,
+      anchoMm: nuevoItemAncho,
+      altoMm: nuevoItemAlto,
+      espesorMm: nuevoItemEspesor,
+      detallesHerrajes: nuevoItemDetalles,
+      cantidad: nuevoItemCantidad
+    };
+
+    const updatedItems = [...caso.items, newItem];
+    updateCaso(caso.id, { items: updatedItems });
+    setShowAddItemForm(false);
+    setNuevoItemDetalles('');
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    const updatedItems = caso.items.filter(i => i.id !== itemId);
+    updateCaso(caso.id, { items: updatedItems });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploaderName = profile?.nombre || user?.email || 'Operador Oficina';
+      const uploadedDoc = await documentosService.uploadDocumento(caso.id, file, uploadTipo, uploaderName);
+      await addFotoToCaso(caso.id, {
+        tipo: uploadedDoc.tipo,
+        url: uploadedDoc.url,
+        subidoPor: uploadedDoc.subidoPor,
+        fecha: uploadedDoc.fecha
+      });
+    } catch (err: any) {
+      console.error('Error al subir documento:', err);
+      setUploadError(err.message || 'Error al subir la imagen.');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleMarcarRealizadoOficina = async () => {
+    setIsSavingTrabajo(true);
+    try {
+      const ok = await marcarTrabajoRealizado(
+        caso.id,
+        costoPrestadorInput || caso.costoPrestador || 10000,
+        caso.fotos[0]?.url || 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80',
+        undefined,
+        obsTrabajoOficina ? `[Oficina]: ${obsTrabajoOficina}` : 'Trabajo completado desde Oficina'
+      );
+      if (ok) {
+        setTrabajoCompletadoExito(true);
+        setTimeout(() => setTrabajoCompletadoExito(false), 3000);
+      }
+    } finally {
+      setIsSavingTrabajo(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Top Header & Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-5 rounded-2xl border border-slate-800">
         <div className="flex items-center gap-3">
@@ -87,22 +196,14 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
         <div className="flex items-center gap-3 flex-wrap">
           <BadgeEstado tipo="operativo" estado={caso.estadoOperativo} />
           <BadgeEstado tipo="financiero" estado={caso.estadoFinanciero} />
-
-          <button
-            onClick={() => onOpenVidrieroPWA(caso.magicToken)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-lg shadow-md shadow-purple-600/20 transition-all"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Ver PWA Vidriero</span>
-          </button>
         </div>
       </div>
 
       {/* Tabs Bar */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('operacion')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'operacion' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 bg-slate-900'
           }`}
         >
@@ -111,25 +212,25 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
 
         <button
           onClick={() => setActiveTab('medidas')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'medidas' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 bg-slate-900'
           }`}
         >
-          <Calendar className="w-4 h-4" /> <span>Medidas e Ítems ({caso.items.length})</span>
+          <Plus className="w-4 h-4" /> <span>Medidas e Ítems ({caso.items.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('fotos')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'fotos' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 bg-slate-900'
           }`}
         >
-          <Image className="w-4 h-4" /> <span>Fotos & Documentos ({caso.fotos.length})</span>
+          <ImageIcon className="w-4 h-4" /> <span>Fotos & Documentos ({caso.fotos.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('finanzas')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'finanzas' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 bg-slate-900'
           }`}
         >
@@ -138,7 +239,7 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
 
         <button
           onClick={() => setActiveTab('timeline')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'timeline' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 bg-slate-900'
           }`}
         >
@@ -235,40 +336,168 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
             </div>
           </div>
 
-          {/* Card Observaciones Operativas */}
-          <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
-              <AlertCircle className="w-4 h-4 text-amber-400" /> Observaciones de Operación
+          {/* Card Finalización Directa de Trabajo desde Oficina */}
+          <div className="glass-panel p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/10 space-y-4">
+            <h3 className="text-sm font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2 border-b border-cyan-500/20 pb-3">
+              <FileCheck className="w-4 h-4 text-cyan-400" /> Registro de Trabajo (Oficina)
             </h3>
 
-            <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-              {caso.infoExtraOperativa || 'Sin observaciones adicionales cargadas.'}
-            </p>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block text-[11px]">Costo Prestador / Mano de Obra ($)</label>
+                <input
+                  type="number"
+                  value={costoPrestadorInput}
+                  onChange={e => setCostoPrestadorInput(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-cyan-200 mt-1 font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block text-[11px]">Observaciones del Trabajo</label>
+                <textarea
+                  rows={2}
+                  value={obsTrabajoOficina}
+                  onChange={e => setObsTrabajoOficina(e.target.value)}
+                  placeholder="Ej: Vidrio instalado conforme en planta baja por equipo de taller"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mt-1 focus:outline-none focus:border-cyan-500 resize-none"
+                />
+              </div>
+
+              {trabajoCompletadoExito && (
+                <div className="p-2 bg-emerald-500/20 border border-emerald-500/40 rounded-lg text-emerald-300 font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" /> Trabajo marcado como realizado
+                </div>
+              )}
+
+              <button
+                onClick={handleMarcarRealizadoOficina}
+                disabled={isSavingTrabajo}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isSavingTrabajo ? 'Guardando...' : 'Marcar Trabajo Realizado'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Tab 2: Medidas e Ítems */}
+      {/* Tab 2: Medidas e Ítems con Carga Directa */}
       {activeTab === 'medidas' && (
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Desglose Estructurado de Vidrios & Herrajes
+                Desglose de Vidrios, Medidas & Herrajes
               </h3>
-              <p className="text-xs text-slate-400">Normalización de medidas en milímetros para taller</p>
+              <p className="text-xs text-slate-400">Carga directa de medidas en milímetros para producción</p>
             </div>
-            <span className="text-xs text-cyan-400 font-mono bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/30">
-              {caso.items.length} Artículos
-            </span>
+
+            <button
+              onClick={() => setShowAddItemForm(!showAddItemForm)}
+              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-md shadow-cyan-600/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{showAddItemForm ? 'Cancelar' : 'Agregar Nuevo Vidrio / Ítem'}</span>
+            </button>
           </div>
+
+          {/* Formulario de Carga Directa de Ítem */}
+          {showAddItemForm && (
+            <div className="p-4 bg-slate-900 border border-cyan-500/40 rounded-xl space-y-4">
+              <h4 className="text-xs font-bold text-cyan-300 uppercase">Cargar Nuevo Cristal al Siniestro</h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+                <div>
+                  <label className="text-slate-400 block text-[11px] mb-1">Tipo de Vidrio</label>
+                  <select
+                    value={nuevoItemTipo}
+                    onChange={e => setNuevoItemTipo(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200"
+                  >
+                    <option value="Vidrio Float 4mm Incoloro">Float 4mm Incoloro</option>
+                    <option value="Vidrio Float 5mm Incoloro">Float 5mm Incoloro</option>
+                    <option value="Vidrio Float 6mm Incoloro">Float 6mm Incoloro</option>
+                    <option value="Vidrio Templado 6mm">Templado 6mm</option>
+                    <option value="Vidrio Templado 8mm">Templado 8mm</option>
+                    <option value="Vidrio Templado 10mm">Templado 10mm</option>
+                    <option value="Laminado 3+3 Incoloro">Laminado 3+3 Incoloro</option>
+                    <option value="Laminado 4+4 Incoloro">Laminado 4+4 Incoloro</option>
+                    <option value="DVH 4/9/4">DVH 4/9/4</option>
+                    <option value="Espejo 4mm">Espejo 4mm</option>
+                    <option value="Fantasia / Armado">Fantasía / Armado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block text-[11px] mb-1">Ancho (mm)</label>
+                  <input
+                    type="number"
+                    value={nuevoItemAncho}
+                    onChange={e => setNuevoItemAncho(parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block text-[11px] mb-1">Alto (mm)</label>
+                  <input
+                    type="number"
+                    value={nuevoItemAlto}
+                    onChange={e => setNuevoItemAlto(parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block text-[11px] mb-1">Espesor (mm)</label>
+                  <input
+                    type="number"
+                    value={nuevoItemEspesor}
+                    onChange={e => setNuevoItemEspesor(parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block text-[11px] mb-1">Cantidad</label>
+                  <input
+                    type="number"
+                    value={nuevoItemCantidad}
+                    onChange={e => setNuevoItemCantidad(parseInt(e.target.value) || 1)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block text-[11px] mb-1">Detalles de Herrajes / Muescas / Cortes</label>
+                <input
+                  type="text"
+                  value={nuevoItemDetalles}
+                  onChange={e => setNuevoItemDetalles(e.target.value)}
+                  placeholder="Ej: 2 muescas superiores, herrajes cromados de freno"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                />
+              </div>
+
+              <button
+                onClick={handleAddItem}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Guardar Ítem de Vidrio</span>
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {caso.items.map((item, idx) => (
-              <div key={item.id} className="glass-card p-4 rounded-xl border border-slate-800 space-y-2">
+              <div key={item.id} className="glass-card p-4 rounded-xl border border-slate-800 space-y-2 relative group">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-cyan-400">Ítem #{idx + 1}</span>
-                  <span className="text-xs font-semibold text-slate-200">{item.tipoArticulo}</span>
+                  <span className="text-xs font-semibold text-slate-200">{item.tipoArticulo} (x{item.cantidad})</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center bg-slate-900 p-2 rounded-lg border border-slate-800 my-2">
@@ -291,6 +520,14 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
                     🔧 <strong>Cortes / Herrajes:</strong> {item.detallesHerrajes}
                   </div>
                 )}
+
+                <button
+                  onClick={() => handleDeleteItem(item.id)}
+                  className="absolute top-3 right-3 p-1 text-slate-500 hover:text-rose-400 transition-colors opacity-80 hover:opacity-100"
+                  title="Eliminar Ítem"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             ))}
           </div>
@@ -302,21 +539,71 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Fotos & Documentos */}
+      {/* Tab 3: Fotos & Documentos con Carga Directa */}
       {activeTab === 'fotos' && (
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Documentación Fotográfica de Campo
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                Documentación Fotográfica & Remitos
+              </h3>
+              <p className="text-xs text-slate-400">Subida directa de imágenes y documentos desde la oficina</p>
+            </div>
             <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
-              {caso.fotos.length} Fotos Registradas
+              {caso.fotos.length} Archivos Registrados
             </span>
           </div>
 
+          {/* Formulario Uploader de Fotos */}
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
+            <h4 className="text-xs font-bold text-cyan-300 uppercase flex items-center gap-2">
+              <Upload className="w-4 h-4" /> Cargar Nueva Imagen / Documento al Caso
+            </h4>
+
+            {uploadError && (
+              <div className="p-2.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs rounded-lg flex items-center gap-2 font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0" /> {uploadError}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="w-full sm:w-auto">
+                <label className="text-slate-400 block text-[10px] mb-1">Categoría del Archivo</label>
+                <select
+                  value={uploadTipo}
+                  onChange={e => setUploadTipo(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                >
+                  <option value="FOTO_ANTES">Foto Antes (Siniestro / Vidrio Roto)</option>
+                  <option value="FOTO_DESPUES">Foto Después (Trabajo Instalado)</option>
+                  <option value="FIRMA_CONFORMIDAD">Acta / Firma de Conformidad</option>
+                  <option value="REMITO">Remito / Factura Material</option>
+                </select>
+              </div>
+
+              <div className="w-full sm:flex-1">
+                <label className="text-slate-400 block text-[10px] mb-1">Seleccionar Imagen (JPG, PNG, WEBP, PDF)</label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                  className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer bg-slate-950 border border-slate-700 rounded-lg p-1"
+                />
+              </div>
+            </div>
+
+            {isUploading && (
+              <div className="text-xs text-cyan-400 font-semibold animate-pulse">
+                Subiendo archivo a Supabase Storage...
+              </div>
+            )}
+          </div>
+
+          {/* Galería de Archivos */}
           {caso.fotos.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl">
-              Sin fotos cargadas. Utilice la PWA del vidriero o suba imágenes del trabajo.
+              Sin fotos cargadas. Suba imágenes usando el formulario superior.
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -409,6 +696,22 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
                 )}
               </div>
 
+              <div className="glass-card p-4 rounded-xl border border-slate-800">
+                <span className="text-[11px] text-slate-400 block font-medium">Precio Vidrio Material</span>
+                {!editingFinances ? (
+                  <div className="text-xl font-bold text-amber-400 mt-1">
+                    ${caso.precioVidrioMaterial.toLocaleString('es-AR')}
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    value={precioVidrioInput}
+                    onChange={e => setPrecioVidrioInput(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-sm text-amber-300 mt-1"
+                  />
+                )}
+              </div>
+
               <div className="glass-card p-4 rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900 to-cyan-950/40">
                 <span className="text-[11px] text-cyan-400 block font-semibold uppercase">Margen Bruto Real</span>
                 <div className="text-xl font-bold text-emerald-400 mt-1">
@@ -419,6 +722,19 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {editingFinances && (
+              <div className="glass-card p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+                <label className="text-slate-400 block text-[11px]">Nº de Factura Emitida</label>
+                <input
+                  type="text"
+                  value={nroFacturaInput}
+                  onChange={e => setNroFacturaInput(e.target.value)}
+                  placeholder="Ej. FC-0001-00001120"
+                  className="w-full max-w-xs bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-200"
+                />
+              </div>
+            )}
 
             {/* Retenciones Impositivas */}
             <div className="glass-card p-5 rounded-xl border border-slate-800 space-y-4">

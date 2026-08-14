@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
 import { X, Plus } from 'lucide-react';
+import type { ItemTrabajo } from '../types';
 
 interface NewSiniestroModalProps {
   isOpen: boolean;
@@ -22,10 +23,30 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
   const [montoCompaniaSinIva, setMontoCompaniaSinIva] = useState<number>(0);
   const [costoPrestador, setCostoPrestador] = useState<number>(0);
 
+  // Campos opcionales de cristal inicial
+  const [anchoMm, setAnchoMm] = useState<number | ''>('');
+  const [altoMm, setAltoMm] = useState<number | ''>('');
+  const [espesorMm, setEspesorMm] = useState<number | ''>('');
+  const [tipoVidrio, setTipoVidrio] = useState('Vidrio Float 4mm');
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const initialItems: ItemTrabajo[] = [];
+    if (anchoMm || altoMm) {
+      initialItems.push({
+        id: `item-init-${Date.now()}`,
+        tipoArticulo: tipoVidrio,
+        anchoMm: typeof anchoMm === 'number' ? anchoMm : 0,
+        altoMm: typeof altoMm === 'number' ? altoMm : 0,
+        espesorMm: typeof espesorMm === 'number' ? espesorMm : 4,
+        detallesHerrajes: '',
+        cantidad: 1
+      });
+    }
+
     addCaso({
       aseguradora,
       nroSiniestro: nroSiniestro || `SIN-${Date.now().toString().slice(-4)}`,
@@ -35,7 +56,8 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
       aseguradoDireccion: aseguradoDireccion || 'Dirección de ejemplo',
       aseguradoCiudad,
       prestadorAsignado,
-      detalleTrabajo: detalleTrabajo || 'Colocación de vidrio float 4mm',
+      detalleTrabajo: detalleTrabajo || `${tipoVidrio} ${anchoMm || 500}x${altoMm || 500}mm`,
+      items: initialItems,
       montoCompaniaSinIva,
       costoPrestador
     });
@@ -142,6 +164,60 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
                 onChange={e => setAseguradoCiudad(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
               />
+            </div>
+          </div>
+
+          {/* Medidas iniciales opcionales del cristal */}
+          <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
+            <label className="text-xs font-bold text-cyan-400 block uppercase">Medidas Iniciales del Cristal (Opcional)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+              <div>
+                <label className="text-slate-400 block text-[10px]">Tipo de Vidrio</label>
+                <select
+                  value={tipoVidrio}
+                  onChange={e => setTipoVidrio(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-slate-200"
+                >
+                  <option value="Vidrio Float 4mm">Float 4mm</option>
+                  <option value="Vidrio Float 5mm">Float 5mm</option>
+                  <option value="Vidrio Templado 6mm">Templado 6mm</option>
+                  <option value="Laminado 3+3">Laminado 3+3</option>
+                  <option value="Espejo 4mm">Espejo 4mm</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block text-[10px]">Ancho (mm)</label>
+                <input
+                  type="number"
+                  placeholder="Ej. 800"
+                  value={anchoMm}
+                  onChange={e => setAnchoMm(e.target.value === '' ? '' : parseInt(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block text-[10px]">Alto (mm)</label>
+                <input
+                  type="number"
+                  placeholder="Ej. 1200"
+                  value={altoMm}
+                  onChange={e => setAltoMm(e.target.value === '' ? '' : parseInt(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block text-[10px]">Espesor (mm)</label>
+                <input
+                  type="number"
+                  placeholder="Ej. 4"
+                  value={espesorMm}
+                  onChange={e => setEspesorMm(e.target.value === '' ? '' : parseInt(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-slate-200"
+                />
+              </div>
             </div>
           </div>
 
