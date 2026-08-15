@@ -67,13 +67,16 @@ canvas {
 
 /* n8n Chat Full Dark Theme Overrides */
 .n8n-chat,
-div[class*="chat-"] {
+.n8n-chat-container,
+div[class*="chat-"],
+section[class*="chat-"] {
   background-color: #020617 !important;
   color: #f8fafc !important;
   border-color: #1e293b !important;
 }
 
 .n8n-chat,
+.n8n-chat > div,
 .n8n-chat-container,
 div[class*="chat-layout"],
 div[class*="chat-wrapper"],
@@ -82,19 +85,19 @@ div[class*="chat-window"] {
   flex-direction: column !important;
   height: 100% !important;
   max-height: 100% !important;
-  position: relative !important;
-  overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 
 div[class*="chat-body"],
-div[class*="chat-messages"] {
+div[class*="chat-messages"],
+main[class*="chat-"] {
   flex: 1 1 auto !important;
   overflow-y: auto !important;
   min-height: 0 !important;
 }
 
 div[class*="chat-header"],
-header[class*="chat"] {
+header[class*="chat-"] {
   background-color: #0f172a !important;
   border-bottom: 1px solid #1e293b !important;
   color: #ffffff !important;
@@ -103,7 +106,7 @@ header[class*="chat"] {
 div[class*="chat-footer"],
 div[class*="chat-inputs"],
 div[class*="chat-input-container"],
-footer[class*="chat"] {
+footer[class*="chat-"] {
   flex: 0 0 auto !important;
   display: flex !important;
   align-items: center !important;

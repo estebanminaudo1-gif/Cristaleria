@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Bot, RefreshCw } from 'lucide-react';
 
 const loadN8nModule = async (): Promise<{ createChat: (config: any) => void }> => {
   if ((window as any).n8nChatModule) {
@@ -28,12 +27,12 @@ export const InternalAssistantView: React.FC = () => {
     i18n: {
       en: {
         title: 'Asistente IA Mercado de Cristales',
-        subtitle: 'Consultas operativas en tiempo real',
+        subtitle: 'Consultas operativas y financieras en tiempo real',
         inputPlaceholder: 'Escribí tu consulta sobre casos, cobros o prestadores...'
       },
       es: {
         title: 'Asistente IA Mercado de Cristales',
-        subtitle: 'Consultas operativas en tiempo real',
+        subtitle: 'Consultas operativas y financieras en tiempo real',
         inputPlaceholder: 'Escribí tu consulta sobre casos, cobros o prestadores...'
       }
     }
@@ -74,63 +73,15 @@ export const InternalAssistantView: React.FC = () => {
     };
   }, [webhookUrl, chatConfig]);
 
-  const handleReset = async () => {
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-      try {
-        const module = await loadN8nModule();
-        if (containerRef.current) {
-          module.createChat({
-            ...chatConfig,
-            target: containerRef.current
-          });
-        }
-      } catch (e: any) {
-        console.error('Error al reiniciar chat:', e);
-      }
-    }
-  };
-
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[500px] glass-panel rounded-2xl border border-slate-800 overflow-hidden bg-slate-950">
-      {/* Header Panel */}
-      <div className="bg-slate-900/90 border-b border-slate-800 p-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
-            <Bot className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              Asistente IA n8n (Agente Conectado)
-              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-mono">
-                Rioplatense
-              </span>
-            </h2>
-            <p className="text-[11px] text-slate-400">
-              Integración oficial con Webhook de n8n ({webhookUrl})
-            </p>
-          </div>
+    <div className="w-full h-[calc(100vh-110px)] min-h-[600px] glass-panel rounded-2xl border border-slate-800 overflow-hidden bg-slate-950 flex flex-col">
+      {chatError ? (
+        <div className="p-6 text-xs text-rose-400 font-semibold text-center">
+          {chatError}
         </div>
-
-        <button
-          onClick={handleReset}
-          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-xs flex items-center gap-1 border border-slate-700"
-          title="Reiniciar chat"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Reiniciar Chat</span>
-        </button>
-      </div>
-
-      {/* Embedded n8n Chat Area */}
-      <div className="flex-1 w-full h-full relative bg-slate-950 overflow-hidden">
-        {chatError && (
-          <div className="p-4 text-xs text-rose-400 font-semibold text-center">
-            {chatError}
-          </div>
-        )}
-        <div ref={containerRef} className="w-full h-full text-slate-100 bg-slate-950" />
-      </div>
+      ) : (
+        <div ref={containerRef} className="w-full h-full text-slate-100 bg-slate-950 flex-1 flex flex-col min-h-0" />
+      )}
     </div>
   );
 };
