@@ -5,7 +5,15 @@ import { casosService } from '../services/casosService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const isDemoModeEnabled = import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
-const LOCAL_STORAGE_KEY = 'mercado_cristales_casos_v1';
+const LOCAL_STORAGE_KEY = 'mercado_cristales_casos_v3';
+
+// Purge legacy storage keys with created cases
+try {
+  localStorage.removeItem('mercado_cristales_casos_v1');
+  localStorage.removeItem('mercado_cristales_casos_v2');
+} catch (e) {
+  console.error('Error limpiando almacenamiento previo:', e);
+}
 
 export interface UserProfile {
   id: string;
