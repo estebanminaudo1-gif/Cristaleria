@@ -72,6 +72,11 @@ const MainAppContent: React.FC = () => {
     );
   }
 
+  const handleExecuteSearch = (query: string) => {
+    setSearchQuery(query);
+    setCurrentTab('siniestros');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
       {/* Header */}
@@ -80,6 +85,7 @@ const MainAppContent: React.FC = () => {
         onOpenEmailModal={() => setIsEmailModalOpen(true)}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        onExecuteSearch={handleExecuteSearch}
       />
 
       {/* Global Error Banner */}

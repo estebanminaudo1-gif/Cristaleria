@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSiniestros } from '../context/SiniestrosContext';
 import { Shield, Plus, Mail, Search, UserCheck, LogOut } from 'lucide-react';
 import type { Role } from '../types';
@@ -8,15 +8,30 @@ interface HeaderProps {
   onOpenEmailModal: () => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  onExecuteSearch?: (query: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenNewModal,
   onOpenEmailModal,
   searchQuery,
-  setSearchQuery
+  setSearchQuery,
+  onExecuteSearch
 }) => {
   const { activeRole, setActiveRole, user, logout, isDemoMode } = useSiniestros();
+  const [localQuery, setLocalQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    setLocalQuery(searchQuery);
+  }, [searchQuery]);
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSearchQuery(localQuery);
+    if (onExecuteSearch) {
+      onExecuteSearch(localQuery);
+    }
+  };
 
   return (
     <header className="glass-panel sticky top-0 z-30 border-b border-slate-800 px-4 py-3">
@@ -37,18 +52,24 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Global Search */}
+        {/* Global Search Form */}
         <div className="flex-1 max-w-md mx-2">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+            <button
+              type="submit"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-400 transition-colors p-0.5 rounded focus:outline-none"
+              title="Buscar (Presioná Enter o hacé clic aquí)"
+            >
+              <Search className="w-4 h-4" />
+            </button>
             <input
               type="text"
               placeholder="Buscar por Siniestro, Cliente, Póliza, Domicilio o Factura..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              value={localQuery}
+              onChange={e => setLocalQuery(e.target.value)}
               className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-cyan-500 transition-colors"
             />
-          </div>
+          </form>
         </div>
 
         {/* Action Controls */}
