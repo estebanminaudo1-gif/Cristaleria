@@ -92,7 +92,7 @@ export const InternalAssistantView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] glass-panel rounded-2xl border border-slate-800 overflow-hidden bg-slate-950">
+    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[500px] glass-panel rounded-2xl border border-slate-800 overflow-hidden bg-slate-950">
       {/* Header Panel */}
       <div className="bg-slate-900/90 border-b border-slate-800 p-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
