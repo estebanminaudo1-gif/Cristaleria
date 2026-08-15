@@ -154,10 +154,9 @@ export const casosService = {
     return mapCasoFromDB(data);
   },
 
-  // 4. Crear nuevo caso
   async createCaso(casoData: Partial<SiniestroCaso>): Promise<SiniestroCaso> {
     if (!isSupabaseConfigured) {
-      const nextNro = Math.max(...initialCasos.map(c => c.nroTrabajo), 1123) + 1;
+      const nextNro = casoData.nroTrabajo || Math.floor(1000 + Math.random() * 9000);
       const nuevoMock: SiniestroCaso = {
         id: `case-${Date.now()}`,
         nroTrabajo: nextNro,

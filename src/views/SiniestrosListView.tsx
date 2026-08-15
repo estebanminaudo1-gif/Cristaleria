@@ -95,7 +95,7 @@ export const SiniestrosListView: React.FC<SiniestrosListViewProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-lg shadow-md shadow-cyan-600/20 transition-all"
           >
             <Plus className="w-4 h-4" />
-            <span>Nuevo Siniestro</span>
+            <span>Nuevo Caso</span>
           </button>
         </div>
       </div>

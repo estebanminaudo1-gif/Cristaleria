@@ -109,7 +109,6 @@ const MainAppContent: React.FC = () => {
           {currentTab === 'dashboard' && (
             <DashboardView
               onSelectCaso={handleOpenCaso}
-              onOpenNewModal={() => setIsNewModalOpen(true)}
               onOpenEmailModal={() => setIsEmailModalOpen(true)}
             />
           )}

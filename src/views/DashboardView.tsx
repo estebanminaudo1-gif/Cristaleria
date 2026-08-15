@@ -6,13 +6,11 @@ import { Clock, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle, FileSpreads
 
 interface DashboardViewProps {
   onSelectCaso: (id: string) => void;
-  onOpenNewModal: () => void;
   onOpenEmailModal: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectCaso,
-  onOpenNewModal,
   onOpenEmailModal
 }) => {
   const { casos } = useSiniestros();
@@ -48,12 +46,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
             <span>Simular Ingesta Email</span>
-          </button>
-          <button
-            onClick={onOpenNewModal}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-lg shadow-lg shadow-cyan-600/20 transition-all"
-          >
-            <span>+ Crear Siniestro</span>
           </button>
         </div>
       </div>

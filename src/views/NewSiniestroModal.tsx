@@ -75,7 +75,7 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Plus className="w-5 h-5 text-cyan-400" />
-            <h3 className="text-base font-bold text-white uppercase tracking-wider">Crear Nuevo Siniestro</h3>
+            <h3 className="text-base font-bold text-white uppercase tracking-wider">Nuevo Caso</h3>
           </div>
           <button onClick={handleClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
             <X className="w-5 h-5" />

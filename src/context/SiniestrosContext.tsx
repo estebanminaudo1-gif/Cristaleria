@@ -301,7 +301,16 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const addCaso = async (casoData: Partial<SiniestroCaso>): Promise<SiniestroCaso> => {
     setSaving(true);
     try {
-      const nuevo = await casosService.createCaso(casoData);
+      const existingNums = new Set(casos.map(c => c.nroTrabajo));
+      let randomNro: number;
+      do {
+        randomNro = Math.floor(1000 + Math.random() * 9000);
+      } while (existingNums.has(randomNro));
+
+      const nuevo = await casosService.createCaso({
+        ...casoData,
+        nroTrabajo: casoData.nroTrabajo || randomNro
+      });
       setCasos(prev => {
         const updated = [nuevo, ...prev];
         if (!isSupabaseConfigured) {
