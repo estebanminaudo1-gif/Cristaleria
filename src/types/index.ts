@@ -1,5 +1,6 @@
 export type EstadoOperativo =
   | 'NUEVO'
+  | 'DEMORADO'
   | 'PENDIENTE_CONTACTO'
   | 'VISITA_COORDINADA'
   | 'PRESUPUESTO_INFORMADO'

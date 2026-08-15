@@ -10,6 +10,7 @@ export const BadgeEstado: React.FC<BadgeEstadoProps> = ({ tipo, estado }) => {
   if (tipo === 'operativo') {
     const config: Record<EstadoOperativo, { bg: string; label: string }> = {
       NUEVO: { bg: 'bg-blue-500/10 border-blue-500/30 text-blue-400', label: 'NUEVO' },
+      DEMORADO: { bg: 'bg-rose-500/20 border-rose-500/40 text-rose-400 font-bold animate-pulse', label: 'DEMORADO (+48H)' },
       PENDIENTE_CONTACTO: { bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400', label: 'PEND. CONTACTO' },
       VISITA_COORDINADA: { bg: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300', label: 'VISITA COORDINADA' },
       PRESUPUESTO_INFORMADO: { bg: 'bg-purple-500/10 border-purple-500/30 text-purple-300', label: 'PRESU. INFORMADO' },

@@ -323,6 +323,7 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mt-1 focus:outline-none focus:border-cyan-500 cursor-pointer"
                 >
                   <option value="NUEVO">NUEVO</option>
+                  <option value="DEMORADO">DEMORADO (+48H)</option>
                   <option value="PENDIENTE_CONTACTO">PENDIENTE_CONTACTO</option>
                   <option value="VISITA_COORDINADA">VISITA_COORDINADA</option>
                   <option value="PRESUPUESTO_INFORMADO">PRESUPUESTO_INFORMADO</option>

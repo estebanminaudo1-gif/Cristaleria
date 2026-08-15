@@ -257,14 +257,50 @@ export const SiniestrosProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [casos]);
 
+  // Motor SLA: Transición automática de casos en NUEVO por más de 48hs a DEMORADO
+  useEffect(() => {
+    if (casos.length === 0) return;
+    const now = Date.now();
+    let hasChanges = false;
+    const updated = casos.map(c => {
+      if (c.estadoOperativo === 'NUEVO' && c.fechaIngreso) {
+        const horas = (now - new Date(c.fechaIngreso).getTime()) / (1000 * 60 * 60);
+        if (horas > 48) {
+          hasChanges = true;
+          return {
+            ...c,
+            estadoOperativo: 'DEMORADO' as EstadoOperativo,
+            timeline: [
+              ...(c.timeline || []),
+              {
+                id: `t-sla-${Date.now()}`,
+                fecha: new Date().toISOString(),
+                usuario: 'Motor SLA 48h',
+                rol: 'SYSTEM',
+                evento: 'EXCEPCION_SLA_48H',
+                descripcion: 'El caso permaneció en estado NUEVO por más de 48hs. Transición automática a estado DEMORADO.'
+              }
+            ]
+          };
+        }
+      }
+      return c;
+    });
+
+    if (hasChanges) {
+      setCasos(updated);
+    }
+  }, [casos]);
+
   // Compute KPIs dynamically
   const kpis: DashboardKPIs = useMemo(() => {
     const abiertos = casos.filter(c => c.estadoOperativo !== 'DOCUMENTACION_COMPLETA' && c.estadoOperativo !== 'CANCELADO');
     const pendCoordinacion = casos.filter(c => c.estadoOperativo === 'NUEVO' || c.estadoOperativo === 'PENDIENTE_CONTACTO');
     const demorados = casos.filter(c => {
-      if (c.estadoOperativo === 'NUEVO') {
+      if (c.estadoOperativo === 'DEMORADO') return true;
+      if (c.estadoOperativo === 'NUEVO' && c.fechaIngreso) {
         const horas = (new Date().getTime() - new Date(c.fechaIngreso).getTime()) / (1000 * 60 * 60);
-        return horas > 24;
+        return horas > 48;
       }
       return false;
     });

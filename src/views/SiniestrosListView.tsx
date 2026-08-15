@@ -49,7 +49,8 @@ export const SiniestrosListView: React.FC<SiniestrosListViewProps> = ({
   const prestadoresUnicos = Array.from(new Set(casos.map(c => c.prestadorAsignado).filter(Boolean))) as string[];
 
   const kanbanColumns: { id: EstadoOperativo; label: string }[] = [
-    { id: 'NUEVO', label: 'Nuevo / Pend. Contacto' },
+    { id: 'NUEVO', label: 'Nuevo' },
+    { id: 'DEMORADO', label: 'Demorado (+48h)' },
     { id: 'VISITA_COORDINADA', label: 'Visita Coordinada' },
     { id: 'PRESUPUESTO_INFORMADO', label: 'Presupuesto Informado' },
     { id: 'TRABAJO_REALIZADO', label: 'Trabajo Realizado' },
@@ -153,6 +154,7 @@ export const SiniestrosListView: React.FC<SiniestrosListViewProps> = ({
           >
             <option value="TODOS" className="bg-slate-900">Estado Operativo: Todos</option>
             <option value="NUEVO" className="bg-slate-900">NUEVO</option>
+            <option value="DEMORADO" className="bg-slate-900">DEMORADO (+48H)</option>
             <option value="VISITA_COORDINADA" className="bg-slate-900">VISITA COORDINADA</option>
             <option value="PRESUPUESTO_INFORMADO" className="bg-slate-900">PRESUPUESTO INFORMADO</option>
             <option value="TRABAJO_REALIZADO" className="bg-slate-900">TRABAJO REALIZADO</option>
