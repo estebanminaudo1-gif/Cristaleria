@@ -125,6 +125,16 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
     updateCaso(caso.id, { items: updatedItems });
   };
 
+  const handleUpdateItemField = (itemId: string, field: keyof ItemTrabajo, value: any) => {
+    const updatedItems = caso.items.map(item => {
+      if (item.id === itemId) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    });
+    updateCaso(caso.id, { items: updatedItems });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
@@ -498,40 +508,87 @@ export const SiniestroDetailView: React.FC<SiniestroDetailViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {caso.items.map((item, idx) => (
-              <div key={item.id} className="glass-card p-4 rounded-xl border border-slate-800 space-y-2 relative group">
-                <div className="flex items-center justify-between">
+              <div key={item.id} className="glass-card p-4 rounded-xl border border-cyan-500/30 bg-slate-900/60 space-y-3 relative group">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-bold text-cyan-400">Ítem #{idx + 1}</span>
-                  <span className="text-xs font-semibold text-slate-200">{item.tipoArticulo} (x{item.cantidad})</span>
+                  <button
+                    onClick={() => handleDeleteItem(item.id)}
+                    className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
+                    title="Eliminar Ítem"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center bg-slate-900 p-2 rounded-lg border border-slate-800 my-2">
+                {/* Tipo de Vidrio */}
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Tipo de Cristal / Vidrio</label>
+                  <input
+                    type="text"
+                    value={item.tipoArticulo || ''}
+                    onChange={e => handleUpdateItemField(item.id, 'tipoArticulo', e.target.value)}
+                    placeholder="Ej. Vidrio Float 4mm Incoloro"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-xs text-slate-100 font-semibold focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Grid de Medidas Editables */}
+                <div className="grid grid-cols-3 gap-2 text-center bg-slate-950/80 p-2 rounded-lg border border-slate-800">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Ancho</span>
-                    <span className="text-xs font-bold text-slate-100">{item.anchoMm ? `${item.anchoMm} mm` : 'N/A'}</span>
+                    <label className="text-[10px] text-cyan-400 block mb-0.5 font-bold">Ancho (mm)</label>
+                    <input
+                      type="number"
+                      value={item.anchoMm || ''}
+                      onChange={e => handleUpdateItemField(item.id, 'anchoMm', parseInt(e.target.value) || 0)}
+                      placeholder="Ej. 900"
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-bold text-slate-100 text-center focus:border-cyan-500 focus:outline-none"
+                    />
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Alto</span>
-                    <span className="text-xs font-bold text-slate-100">{item.altoMm ? `${item.altoMm} mm` : 'N/A'}</span>
+                    <label className="text-[10px] text-cyan-400 block mb-0.5 font-bold">Alto (mm)</label>
+                    <input
+                      type="number"
+                      value={item.altoMm || ''}
+                      onChange={e => handleUpdateItemField(item.id, 'altoMm', parseInt(e.target.value) || 0)}
+                      placeholder="Ej. 1410"
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-bold text-slate-100 text-center focus:border-cyan-500 focus:outline-none"
+                    />
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Espesor</span>
-                    <span className="text-xs font-bold text-slate-100">{item.espesorMm ? `${item.espesorMm} mm` : 'N/A'}</span>
+                    <label className="text-[10px] text-cyan-400 block mb-0.5 font-bold">Espesor (mm)</label>
+                    <input
+                      type="number"
+                      value={item.espesorMm || ''}
+                      onChange={e => handleUpdateItemField(item.id, 'espesorMm', parseInt(e.target.value) || 0)}
+                      placeholder="Ej. 4"
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-bold text-slate-100 text-center focus:border-cyan-500 focus:outline-none"
+                    />
                   </div>
                 </div>
 
-                {item.detallesHerrajes && (
-                  <div className="text-xs text-amber-300/90 bg-amber-500/10 p-2 rounded border border-amber-500/20">
-                    🔧 <strong>Cortes / Herrajes:</strong> {item.detallesHerrajes}
+                {/* Cantidad y Cortes / Herrajes */}
+                <div className="grid grid-cols-3 gap-2 items-center">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Cantidad</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.cantidad || 1}
+                      onChange={e => handleUpdateItemField(item.id, 'cantidad', parseInt(e.target.value) || 1)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-slate-200 text-center font-bold"
+                    />
                   </div>
-                )}
-
-                <button
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="absolute top-3 right-3 p-1 text-slate-500 hover:text-rose-400 transition-colors opacity-80 hover:opacity-100"
-                  title="Eliminar Ítem"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                  <div className="col-span-2">
+                    <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Herrajes / Cortes</label>
+                    <input
+                      type="text"
+                      value={item.detallesHerrajes || ''}
+                      onChange={e => handleUpdateItemField(item.id, 'detallesHerrajes', e.target.value)}
+                      placeholder="Ej. 2 muescas, herrajes..."
+                      className="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-amber-300 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>

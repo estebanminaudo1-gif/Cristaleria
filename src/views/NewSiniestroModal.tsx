@@ -21,6 +21,9 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
   const [detalleTrabajo, setDetalleTrabajo] = useState('');
   const [montoCompaniaSinIva, setMontoCompaniaSinIva] = useState<number>(0);
   const [costoPrestador, setCostoPrestador] = useState<number>(0);
+  const [anchoMm, setAnchoMm] = useState<number | ''>('');
+  const [altoMm, setAltoMm] = useState<number | ''>('');
+  const [espesorMm, setEspesorMm] = useState<number | ''>('');
 
   const resetForm = () => {
     setAseguradora('BBVA');
@@ -34,6 +37,9 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
     setDetalleTrabajo('');
     setMontoCompaniaSinIva(0);
     setCostoPrestador(0);
+    setAnchoMm('');
+    setAltoMm('');
+    setEspesorMm('');
   };
 
   useEffect(() => {
@@ -63,7 +69,17 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
       prestadorAsignado,
       detalleTrabajo: detalleTrabajo || 'Colocación de vidrio',
       montoCompaniaSinIva,
-      costoPrestador
+      costoPrestador,
+      items: [
+        {
+          id: `item-${Date.now()}`,
+          tipoArticulo: detalleTrabajo || 'Vidrio General',
+          anchoMm: Number(anchoMm) || undefined,
+          altoMm: Number(altoMm) || undefined,
+          espesorMm: Number(espesorMm) || undefined,
+          cantidad: 1
+        }
+      ]
     });
 
     handleClose();
@@ -205,6 +221,39 @@ export const NewSiniestroModal: React.FC<NewSiniestroModalProps> = ({ isOpen, on
                 value={costoPrestador || ''}
                 onChange={e => setCostoPrestador(parseFloat(e.target.value) || 0)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+            <div>
+              <label className="text-xs font-semibold text-cyan-400 block mb-1">Ancho (mm)</label>
+              <input
+                type="number"
+                placeholder="Ej. 900"
+                value={anchoMm}
+                onChange={e => setAnchoMm(e.target.value === '' ? '' : parseInt(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-bold text-slate-100 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-cyan-400 block mb-1">Alto (mm)</label>
+              <input
+                type="number"
+                placeholder="Ej. 1410"
+                value={altoMm}
+                onChange={e => setAltoMm(e.target.value === '' ? '' : parseInt(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-bold text-slate-100 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-cyan-400 block mb-1">Espesor (mm)</label>
+              <input
+                type="number"
+                placeholder="Ej. 4"
+                value={espesorMm}
+                onChange={e => setEspesorMm(e.target.value === '' ? '' : parseInt(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-bold text-slate-100 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
